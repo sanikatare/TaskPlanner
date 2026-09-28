@@ -1,0 +1,215 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-50: #eff6ff;
+    --brand-100: #dbeafe;
+    --brand-200: #bfdbfe;
+    --brand-300: #93c5fd;
+    --brand-400: #60a5fa;
+    --brand-500: #3b82f6;
+    --brand-600: #2563eb;
+    --brand-700: #1d4ed8;
+    --brand-800: #1e40af;
+    --brand-900: #1e3a8a;
+    --surface-page: #f8fafc;
+    --surface-card: #ffffff;
+    --text-primary: #0f172a;
+    --text-secondary: #475569;
+    --text-muted: #64748b;
+    --border-default: #e2e8f0;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-[#F8FAFC] text-slate-900 font-sans antialiased;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-display text-slate-900 tracking-tight;
+    text-wrap: balance;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+
+  ::selection {
+    background: rgba(37, 99, 235, 0.14);
+    color: #1e3a8a;
+  }
+}
+
+@layer components {
+  /* ── Page Layout ──────────────────────────────────────────────── */
+  .page-shell {
+    @apply px-5 py-6 sm:px-8 sm:py-7 max-w-[1280px] mx-auto animate-fade-in;
+  }
+
+  .page-title {
+    @apply text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight;
+  }
+
+  .page-subtitle {
+    @apply text-sm text-slate-500 mt-1;
+  }
+
+  /* ── Single-Elevation Structural Surfaces ─────────────────────── */
+  .card {
+    @apply rounded-xl bg-white border border-slate-200/90 transition-colors duration-150;
+  }
+
+  .card-interactive {
+    @apply rounded-xl bg-white border border-slate-200/90 hover:border-slate-300 transition-colors duration-150;
+  }
+
+  .card-accent {
+    @apply rounded-xl bg-slate-50/80 border border-slate-200/90 transition-colors duration-150;
+  }
+
+  /* ── Buttons (Single-line, 2x horizontal padding, fast feedback) ─ */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm
+           text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800
+           transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1
+           whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm
+           text-brand-700 bg-brand-50 hover:bg-brand-100/80 border border-brand-200/70
+           transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30
+           whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg font-medium text-xs sm:text-sm
+           text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300
+           transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30
+           whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ── Form Elements ────────────────────────────────────────────── */
+  .input {
+    @apply w-full px-3.5 py-2 rounded-lg font-sans text-sm text-slate-900 placeholder-slate-400
+           bg-white border border-slate-200 transition-colors duration-150;
+  }
+  .input:focus {
+    @apply outline-none border-brand-500 ring-2 ring-brand-500/15;
+  }
+
+  .label {
+    @apply block text-xs font-medium text-slate-700 mb-1.5;
+  }
+
+  /* ── Progress ─────────────────────────────────────────────────── */
+  .progress-bar {
+    @apply h-1.5 rounded-full overflow-hidden bg-slate-100;
+  }
+  .progress-fill {
+    @apply h-full rounded-full bg-brand-600 transition-all duration-500 ease-out;
+  }
+
+  /* ── Dividers ─────────────────────────────────────────────────── */
+  .divider-line {
+    @apply h-px bg-slate-200/80;
+  }
+
+  /* ── Stats ────────────────────────────────────────────────────── */
+  .stat-number {
+    @apply text-2xl sm:text-3xl font-semibold text-slate-900 font-mono tabular-nums tracking-tight;
+  }
+
+  /* ── Auth Layout ──────────────────────────────────────────────── */
+  .auth-shell {
+    @apply min-h-screen flex bg-[#F8FAFC];
+  }
+
+  .auth-panel {
+    @apply hidden lg:flex lg:w-[46%] flex-col justify-between p-12 xl:p-16 bg-slate-900 text-white relative overflow-hidden border-r border-slate-800;
+  }
+
+  /* ── Alerts ───────────────────────────────────────────────────── */
+  .alert-info {
+    @apply p-3 rounded-lg border text-xs font-medium bg-brand-50/70 border-brand-200 text-brand-800;
+  }
+  .alert-warning {
+    @apply p-3 rounded-lg border text-xs font-medium bg-amber-50/80 border-amber-200 text-amber-800;
+  }
+  .alert-success {
+    @apply p-3 rounded-lg border text-xs font-medium bg-emerald-50/80 border-emerald-200 text-emerald-800;
+  }
+
+  /* ── Empty States ─────────────────────────────────────────────── */
+  .empty-state {
+    @apply card flex flex-col items-center justify-center py-14 px-6 text-center;
+  }
+
+  /* ── Skeleton Loader ──────────────────────────────────────────── */
+  .skeleton {
+    @apply rounded-xl bg-slate-200/70 animate-pulse;
+  }
+}
+
+@layer utilities {
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .animate-check-pop {
+    animation: check-pop 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  .animate-check-draw {
+    animation: check-draw 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+}
+
+@keyframes check-pop {
+  0% {
+    transform: scale(0.82);
+  }
+  45% {
+    transform: scale(1.22);
+  }
+  75% {
+    transform: scale(0.95);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 16;
+    opacity: 0.4;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
