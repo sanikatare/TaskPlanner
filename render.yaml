@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: studyai-scheduler
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
+      - key: ALLOW_DEV_AUTH
+        value: "true"
+      - key: VITE_ALLOW_DEV_AUTH
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true

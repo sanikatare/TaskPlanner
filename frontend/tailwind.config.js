@@ -25,9 +25,10 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans:    ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
-        mono:    ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans:    ['"Playfair Display"', 'Georgia', 'serif'],
+        display: ['"Playfair Display"', 'Georgia', 'serif'],
+        serif:   ['"Playfair Display"', 'Georgia', 'serif'],
+        mono:    ['"Playfair Display"', 'Georgia', 'serif'],
       },
       boxShadow: {
         card:    '0 1px 3px rgba(15,23,42,0.04), 0 4px 16px rgba(37,99,235,0.04)',

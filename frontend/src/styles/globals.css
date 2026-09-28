@@ -26,15 +26,24 @@
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 400;
   }
 
   body {
-    @apply bg-[#F8FAFC] text-slate-900 font-sans antialiased;
+    @apply bg-[#F8FAFC] text-slate-900 font-sans font-normal antialiased;
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 400;
     min-height: 100vh;
   }
 
+  h1, h2, h3, h4, h5, h6, p, span, div, button, input, select, textarea, label, a, th, td {
+    font-family: 'Playfair Display', Georgia, serif;
+    font-weight: 400;
+  }
+
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display text-slate-900 tracking-tight;
+    @apply font-display font-normal text-slate-900 tracking-tight;
     text-wrap: balance;
   }
 
@@ -175,6 +184,18 @@
 }
 
 @layer utilities {
+  .font-sans,
+  .font-display,
+  .font-mono,
+  .font-serif,
+  .font-normal,
+  .font-medium,
+  .font-semibold,
+  .font-bold {
+    font-family: 'Playfair Display', Georgia, serif !important;
+    font-weight: 400 !important;
+  }
+
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }

@@ -443,30 +443,28 @@ POST /api/ai/generate-plan
 
 ## Deployment
 
-### Frontend
+### Deploy on Render (Recommended)
 
-Deploy using:
+This repository is pre-configured to deploy both the React frontend and Express API as a single unified Render Web Service.
 
-* Vercel
-* Netlify
+#### Option 1: Render Blueprint (1-Click)
+1. Push your repository to GitHub/GitLab.
+2. In the [Render Dashboard](https://dashboard.render.com), click **New +** → **Blueprint**.
+3. Select your repository — Render will automatically detect `render.yaml` and configure the build, start command, and health check (`/health`).
 
-### Backend
-
-Deploy using:
-
-* Railway
-* Render
-* AWS
-
-### Database
-
-* MongoDB Atlas
-
-### AI Service
-
-* Railway
-* Render
-* Docker
+#### Option 2: Manual Render Web Service
+1. Click **New +** → **Web Service** and connect your repository.
+2. Configure the service settings:
+   * **Runtime**: `Node`
+   * **Root Directory**: *(leave blank)*
+   * **Build Command**: `npm install --include=dev && npm run build` (or `npm run render-build`)
+   * **Start Command**: `npm run start`
+   * **Health Check Path**: `/health`
+3. Environment Variables (Optional — the app works out-of-the-box with its built-in store and demo workspace):
+   * `ALLOW_DEV_AUTH=true`
+   * `VITE_ALLOW_DEV_AUTH=true`
+   * `MONGODB_URI` *(optional: MongoDB Atlas connection string)*
+   * `ANTHROPIC_API_KEY` *(optional: for live Claude study plans)*
 
 ### Docker
 

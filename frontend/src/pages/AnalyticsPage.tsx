@@ -38,7 +38,7 @@ const CHART_DEFAULTS = {
     legend: {
       labels: {
         color: '#64748b',
-        font: { family: '"Plus Jakarta Sans"', size: 11, weight: '500' as const },
+        font: { family: '"Playfair Display", Georgia, serif', size: 11, weight: 'normal' as const },
         padding: 14,
         usePointStyle: true,
         pointStyleWidth: 8,
@@ -50,8 +50,8 @@ const CHART_DEFAULTS = {
       borderWidth: 1,
       titleColor: '#f8fafc',
       bodyColor: '#cbd5e1',
-      titleFont: { family: '"Plus Jakarta Sans"', weight: '600' as const, size: 12 },
-      bodyFont: { family: '"JetBrains Mono"', size: 11 },
+      titleFont: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 12 },
+      bodyFont: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 },
       padding: 10,
       boxPadding: 5,
       cornerRadius: 8,
@@ -61,12 +61,12 @@ const CHART_DEFAULTS = {
   },
   scales: {
     x: {
-      ticks: { color: '#64748b', font: { family: '"Plus Jakarta Sans"', size: 11 } },
+      ticks: { color: '#64748b', font: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 } },
       grid: { color: '#f1f5f9', drawBorder: false },
       border: { display: false },
     },
     y: {
-      ticks: { color: '#64748b', font: { family: '"JetBrains Mono"', size: 11 } },
+      ticks: { color: '#64748b', font: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 } },
       grid: { color: '#f1f5f9', drawBorder: false },
       border: { display: false },
     },

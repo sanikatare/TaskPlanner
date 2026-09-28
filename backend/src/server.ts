@@ -56,12 +56,21 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai',        aiRoutes);
 app.use('/api/calendar',  calendarRoutes);
 
-// Health check
-app.get('/health', (_, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+// Health check (Render & container readiness)
+const healthHandler = (_: express.Request, res: express.Response) =>
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
-// Serve built frontend static files
-const frontendDistPath = path.resolve(__dirname, '../../frontend/dist');
-if (fs.existsSync(frontendDistPath)) {
+// Serve built frontend static files (supports running from root or backend workspace)
+const candidateDistPaths = [
+  path.resolve(__dirname, '../../frontend/dist'),
+  path.resolve(process.cwd(), 'frontend/dist'),
+  path.resolve(process.cwd(), '../frontend/dist'),
+];
+const frontendDistPath = candidateDistPaths.find((p) => fs.existsSync(p));
+
+if (frontendDistPath) {
   app.use(
     express.static(frontendDistPath, {
       etag: false,

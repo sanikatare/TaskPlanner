@@ -10,7 +10,11 @@
     "dev:backend": "npm run dev -w backend",
     "install:all": "npm install",
     "build": "npm run build -w frontend && npm run build -w backend",
-    "start": "npm run start -w backend"
+    "render-build": "npm install --include=dev && npm run build",
+    "start": "node -e \"if(!require('fs').existsSync('frontend/dist/index.html')||!require('fs').existsSync('backend/dist/server.js'))require('child_process').execSync('npm run build',{stdio:'inherit'})\" && npm run start -w backend"
+  },
+  "engines": {
+    "node": ">=18.0.0"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1"
