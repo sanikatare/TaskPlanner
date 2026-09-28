@@ -54,11 +54,11 @@ export default function TaskCheckButton({
       aria-label={label}
       aria-pressed={isVisuallyChecked}
       className={clsx(
-        'relative rounded-md border flex items-center justify-center shrink-0 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 focus-visible:ring-offset-1',
+        'relative rounded-lg border flex items-center justify-center shrink-0 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/40 focus-visible:ring-offset-1',
         size === 'sm' ? 'w-4 h-4' : 'w-5 h-5',
         isVisuallyChecked
-          ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
-          : 'border-slate-300 hover:border-emerald-500 hover:bg-emerald-50/40 bg-white text-transparent',
+          ? 'bg-gradient-to-br from-[#D44FA6] to-[#9333EA] border-[#B8328A] text-white shadow-xs'
+          : 'border-[#DEC0DC] hover:border-[#D44FA6] hover:bg-[#FDF4F9] bg-[#FFFBFD] text-transparent',
         animatingCheck && 'animate-check-pop',
         disabled && 'opacity-60 cursor-not-allowed',
         className

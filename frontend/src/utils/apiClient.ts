@@ -39,7 +39,10 @@ apiClient.interceptors.request.use(
     if (user) {
       const token = await user.getIdToken();
       config.headers.Authorization = `Bearer ${token}`;
+      return config;
     }
+
+    config.headers.Authorization = 'Bearer dev:student-demo';
     return config;
   },
   (error: AxiosError) => Promise.reject(error),
@@ -47,18 +50,7 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError) => {
-    if (error.response?.status === 401) {
-      if (getAuthToken()) {
-        clearAuthToken();
-        window.location.href = '/login';
-        return Promise.reject(error);
-      }
-      await auth?.signOut();
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  },
+  async (error: AxiosError) => Promise.reject(error),
 );
 
 export default apiClient;

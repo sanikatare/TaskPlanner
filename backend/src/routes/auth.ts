@@ -133,8 +133,24 @@ router.post('/google', async (req, res: Response, next) => {
 // GET /api/auth/me
 router.get('/me', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
-    const user = await User.findOne({ uid: req.uid });
-    if (!user) throw new AppError('User not found', 404);
+    const uid = req.uid ?? 'student-demo';
+    let user = await User.findOne({ uid });
+    if (!user) {
+      user = await User.findOneAndUpdate(
+        { uid },
+        {
+          $setOnInsert: {
+            uid,
+            email: req.email ?? `${uid}@university.edu`,
+            displayName: uid === 'student-demo' ? 'Student Workspace' : 'Student',
+            authProvider: 'local',
+            studyHoursPerDay: 6,
+            preferredStudyTimes: ['morning', 'evening'],
+          },
+        },
+        { upsert: true, new: true }
+      );
+    }
     res.json({ success: true, data: user });
   } catch (err) { next(err); }
 });
@@ -142,12 +158,24 @@ router.get('/me', authenticate, async (req: AuthRequest, res: Response, next) =>
 // PATCH /api/auth/me
 router.patch('/me', authenticate, async (req: AuthRequest, res: Response, next) => {
   try {
+    const uid = req.uid ?? 'student-demo';
     const allowed = ['displayName','studyHoursPerDay','preferredStudyTimes','subjects','currentSemester','notificationsEnabled','fcmToken'];
     const updates: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in req.body) updates[key] = req.body[key];
     }
-    const user = await User.findOneAndUpdate({ uid: req.uid }, updates, { new: true });
+    const user = await User.findOneAndUpdate(
+      { uid },
+      {
+        ...updates,
+        $setOnInsert: {
+          uid,
+          email: req.email ?? `${uid}@university.edu`,
+          authProvider: 'local',
+        },
+      },
+      { upsert: true, new: true }
+    );
     res.json({ success: true, data: user });
   } catch (err) { next(err); }
 });

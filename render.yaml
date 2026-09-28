@@ -1,11 +1,12 @@
 services:
   - type: web
-    name: studyai-scheduler
+    name: tasktrack-ai
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build
+    buildCommand: npm run render-build
     startCommand: npm start
     healthCheckPath: /health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
@@ -15,5 +16,11 @@ services:
         value: "true"
       - key: VITE_ALLOW_DEV_AUTH
         value: "true"
+      - key: VITE_USE_MONGO_AUTH
+        value: "true"
       - key: JWT_SECRET
         generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

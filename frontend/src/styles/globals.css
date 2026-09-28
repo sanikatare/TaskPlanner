@@ -4,22 +4,16 @@
 
 @layer base {
   :root {
-    --brand-50: #eff6ff;
-    --brand-100: #dbeafe;
-    --brand-200: #bfdbfe;
-    --brand-300: #93c5fd;
-    --brand-400: #60a5fa;
-    --brand-500: #3b82f6;
-    --brand-600: #2563eb;
-    --brand-700: #1d4ed8;
-    --brand-800: #1e40af;
-    --brand-900: #1e3a8a;
-    --surface-page: #f8fafc;
-    --surface-card: #ffffff;
-    --text-primary: #0f172a;
-    --text-secondary: #475569;
-    --text-muted: #64748b;
-    --border-default: #e2e8f0;
+    --brand-50: #fdf4f9;
+    --brand-100: #fce8f4;
+    --brand-200: #f9d0ea;
+    --brand-300: #f3a9d8;
+    --brand-400: #e779c1;
+    --brand-500: #d44fa6;
+    --brand-600: #b8328a;
+    --brand-700: #96246f;
+    --brand-800: #781d59;
+    --brand-900: #561540;
   }
 
   html {
@@ -31,7 +25,30 @@
   }
 
   body {
-    @apply bg-[#F8FAFC] text-slate-900 font-sans font-normal antialiased;
+    @apply text-slate-900 font-sans font-normal antialiased;
+    background-color: #f8edf7;
+    background-image:
+      linear-gradient(
+        to right,
+        transparent 52px,
+        rgba(226, 118, 183, 0.42) 52px,
+        rgba(226, 118, 183, 0.42) 53.5px,
+        transparent 53.5px,
+        transparent 57px,
+        rgba(226, 118, 183, 0.22) 57px,
+        rgba(226, 118, 183, 0.22) 58px,
+        transparent 58px
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 31px,
+        rgba(198, 142, 204, 0.34) 31px,
+        rgba(198, 142, 204, 0.34) 32px
+      ),
+      radial-gradient(at 0% 0%, rgba(252, 231, 243, 0.85) 0px, transparent 55%),
+      radial-gradient(at 100% 0%, rgba(233, 213, 255, 0.75) 0px, transparent 55%),
+      radial-gradient(at 50% 100%, rgba(250, 232, 255, 0.8) 0px, transparent 60%);
     font-family: 'Playfair Display', Georgia, serif;
     font-weight: 400;
     min-height: 100vh;
@@ -59,117 +76,180 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #e2c2df;
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #cfa3cb;
   }
 
   ::selection {
-    background: rgba(37, 99, 235, 0.14);
-    color: #1e3a8a;
+    background: rgba(212, 79, 166, 0.16);
+    color: #561540;
   }
 }
 
 @layer components {
-  /* ── Page Layout ──────────────────────────────────────────────── */
+  /* ── Diary Page Layout ────────────────────────────────────────── */
   .page-shell {
-    @apply px-5 py-6 sm:px-8 sm:py-7 max-w-[1280px] mx-auto animate-fade-in;
+    @apply px-6 py-7 sm:px-10 sm:py-9 max-w-[1200px] mx-auto animate-fade-in;
   }
 
   .page-title {
-    @apply text-xl sm:text-2xl font-semibold text-slate-900 tracking-tight;
+    @apply text-2xl sm:text-3xl font-normal text-slate-900 tracking-tight;
   }
 
   .page-subtitle {
     @apply text-sm text-slate-500 mt-1;
   }
 
-  /* ── Single-Elevation Structural Surfaces ─────────────────────── */
+  /* ── Authentic Ruled Diary Page Surface ───────────────────────── */
+  .diary-page-surface {
+    background-color: #fdf8fc;
+    background-image:
+      linear-gradient(
+        to right,
+        transparent 42px,
+        rgba(228, 115, 183, 0.45) 42px,
+        rgba(228, 115, 183, 0.45) 43.5px,
+        transparent 43.5px,
+        transparent 47px,
+        rgba(228, 115, 183, 0.22) 47px,
+        rgba(228, 115, 183, 0.22) 48px,
+        transparent 48px
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 31px,
+        rgba(198, 140, 204, 0.36) 31px,
+        rgba(198, 140, 204, 0.36) 32px
+      ),
+      radial-gradient(at 15% 15%, rgba(252, 231, 243, 0.65) 0px, transparent 50%),
+      radial-gradient(at 85% 85%, rgba(243, 232, 255, 0.65) 0px, transparent 50%);
+    background-attachment: local;
+  }
+
+  /* ── Plain Card Interior (No Lines Behind Text) ───────────────── */
+  .diary-ruled-card {
+    background-color: #fffcfe;
+    background-image: none;
+  }
+
+  /* ── Stationery Cards with Stacked Diary Page Shadow ──────────── */
   .card {
-    @apply rounded-xl bg-white border border-slate-200/90 transition-colors duration-150;
+    @apply rounded-2xl bg-[#FFFCFE] border border-[#E8CEE6] transition-all duration-200;
+    background-image: none;
+    box-shadow:
+      0 2px 0 0 #f6e7f5,
+      0 5px 0 -1px #fffafd,
+      0 5px 0 0 #e9cfe7,
+      0 10px 24px -4px rgba(150, 36, 111, 0.06);
   }
 
   .card-interactive {
-    @apply rounded-xl bg-white border border-slate-200/90 hover:border-slate-300 transition-colors duration-150;
+    @apply rounded-2xl bg-[#FFFCFE] border border-[#E8CEE6] hover:border-[#D9AED5] transition-all duration-200;
+    background-image: none;
+    box-shadow:
+      0 2px 0 0 #f6e7f5,
+      0 5px 0 -1px #fffafd,
+      0 5px 0 0 #e9cfe7,
+      0 12px 28px -4px rgba(150, 36, 111, 0.09);
   }
 
   .card-accent {
-    @apply rounded-xl bg-slate-50/80 border border-slate-200/90 transition-colors duration-150;
+    @apply rounded-2xl bg-gradient-to-r from-[#FDF2F8] via-[#FCF6FF] to-[#F3E8FF] border border-[#E6C6E4] transition-all duration-200;
+    box-shadow: 0 6px 20px -4px rgba(150, 36, 111, 0.06);
   }
 
-  /* ── Buttons (Single-line, 2x horizontal padding, fast feedback) ─ */
+  /* ── Light Green Important Action Buttons ─────────────────────── */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm
-           text-white bg-brand-600 hover:bg-brand-700 active:bg-brand-800
-           transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40 focus-visible:ring-offset-1
-           whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm;
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-normal text-xs sm:text-sm
+           text-[#0F4C2A] bg-gradient-to-b from-[#D1FAE5] to-[#A7F3D0] hover:from-[#BBF7D0] hover:to-[#86EFAC]
+           border border-[#6EE7B7] hover:-translate-y-[1px] active:translate-y-0
+           transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#34D399]/40
+           whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.75),
+      0 2px 6px rgba(16, 185, 129, 0.14);
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg font-semibold text-xs sm:text-sm
-           text-brand-700 bg-brand-50 hover:bg-brand-100/80 border border-brand-200/70
-           transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-normal text-xs sm:text-sm
+           text-[#96246F] bg-[#FDF4F9] hover:bg-[#FCE8F4] border border-[#F0C6E4]
+           transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400/30
            whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg font-medium text-xs sm:text-sm
-           text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300
-           transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/30
+    @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl font-normal text-xs sm:text-sm
+           text-slate-700 bg-white/90 hover:bg-[#FDF4F9] border border-[#EAD4E8] hover:border-[#D9B2D6]
+           transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300/30
            whitespace-nowrap shrink-0 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* ── Official Google Sign-In Button Style ─────────────────────── */
+  .gsi-material-button {
+    @apply inline-flex items-center justify-center bg-white border border-[#dadce0] rounded-xl px-3.5 py-2 text-xs sm:text-sm text-[#3c4043] hover:bg-[#f8f9fa] transition-all shadow-sm cursor-pointer shrink-0;
+  }
+  .gsi-material-button-content-wrapper {
+    @apply flex items-center gap-2.5;
+  }
+  .gsi-material-button-icon {
+    @apply w-4 h-4 shrink-0;
   }
 
   /* ── Form Elements ────────────────────────────────────────────── */
   .input {
-    @apply w-full px-3.5 py-2 rounded-lg font-sans text-sm text-slate-900 placeholder-slate-400
-           bg-white border border-slate-200 transition-colors duration-150;
+    @apply w-full px-3.5 py-2 rounded-xl font-sans text-sm text-slate-900 placeholder-slate-400
+           bg-white/95 border border-[#E8CEE6] transition-colors duration-150;
   }
   .input:focus {
-    @apply outline-none border-brand-500 ring-2 ring-brand-500/15;
+    @apply outline-none border-brand-500 ring-2 ring-brand-400/15 bg-white;
   }
 
   .label {
-    @apply block text-xs font-medium text-slate-700 mb-1.5;
+    @apply block text-xs font-normal text-slate-700 mb-1.5;
   }
 
   /* ── Progress ─────────────────────────────────────────────────── */
   .progress-bar {
-    @apply h-1.5 rounded-full overflow-hidden bg-slate-100;
+    @apply h-1.5 rounded-full overflow-hidden bg-[#F5E8F3];
   }
   .progress-fill {
-    @apply h-full rounded-full bg-brand-600 transition-all duration-500 ease-out;
+    @apply h-full rounded-full bg-gradient-to-r from-[#E779C1] to-[#A855F7] transition-all duration-500 ease-out;
   }
 
   /* ── Dividers ─────────────────────────────────────────────────── */
   .divider-line {
-    @apply h-px bg-slate-200/80;
+    @apply h-px bg-[#EAD4E8];
   }
 
   /* ── Stats ────────────────────────────────────────────────────── */
   .stat-number {
-    @apply text-2xl sm:text-3xl font-semibold text-slate-900 font-mono tabular-nums tracking-tight;
-  }
-
-  /* ── Auth Layout ──────────────────────────────────────────────── */
-  .auth-shell {
-    @apply min-h-screen flex bg-[#F8FAFC];
-  }
-
-  .auth-panel {
-    @apply hidden lg:flex lg:w-[46%] flex-col justify-between p-12 xl:p-16 bg-slate-900 text-white relative overflow-hidden border-r border-slate-800;
+    @apply text-2xl sm:text-3xl font-normal text-slate-900 font-mono tabular-nums tracking-tight;
   }
 
   /* ── Alerts ───────────────────────────────────────────────────── */
   .alert-info {
-    @apply p-3 rounded-lg border text-xs font-medium bg-brand-50/70 border-brand-200 text-brand-800;
+    @apply p-3 rounded-xl border text-xs font-normal bg-[#FDF4F9] border-[#F3CBE6] text-brand-800;
   }
   .alert-warning {
-    @apply p-3 rounded-lg border text-xs font-medium bg-amber-50/80 border-amber-200 text-amber-800;
+    @apply p-3 rounded-xl border text-xs font-normal bg-[#FAF5FF] border-[#E9D5FF] text-indigo-800;
   }
   .alert-success {
-    @apply p-3 rounded-lg border text-xs font-medium bg-emerald-50/80 border-emerald-200 text-emerald-800;
+    @apply p-3 rounded-xl border text-xs font-normal bg-[#ECFDF5] border-[#A7F3D0] text-[#0F4C2A];
+  }
+
+  /* ── Priority Urgency Badges ──────────────────────────────────── */
+  .badge-high {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-[11px] leading-4 border bg-rose-50 text-rose-700 border-rose-200/90 whitespace-nowrap shrink-0;
+  }
+  .badge-medium {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-[11px] leading-4 border bg-amber-50 text-amber-700 border-amber-200/90 whitespace-nowrap shrink-0;
+  }
+  .badge-low {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-[11px] leading-4 border bg-emerald-50 text-emerald-700 border-emerald-200/90 whitespace-nowrap shrink-0;
   }
 
   /* ── Empty States ─────────────────────────────────────────────── */
@@ -179,7 +259,7 @@
 
   /* ── Skeleton Loader ──────────────────────────────────────────── */
   .skeleton {
-    @apply rounded-xl bg-slate-200/70 animate-pulse;
+    @apply rounded-2xl bg-[#F5E8F3]/70 animate-pulse;
   }
 }
 
@@ -214,10 +294,10 @@
     transform: scale(0.82);
   }
   45% {
-    transform: scale(1.22);
+    transform: scale(1.2);
   }
   75% {
-    transform: scale(0.95);
+    transform: scale(0.96);
   }
   100% {
     transform: scale(1);

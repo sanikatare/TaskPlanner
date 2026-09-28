@@ -8,23 +8,23 @@ import {
   type DropResult,
 } from '@hello-pangea/dnd';
 import {
-  Check,
-  Clock,
-  AlertTriangle,
+  Calendar,
   ArrowRight,
   Plus,
-  BookOpen,
-  RefreshCw,
   GripVertical,
+  ExternalLink,
+  BookOpen,
+  Sparkles,
 } from 'lucide-react';
+import { format } from 'date-fns';
 import apiClient from '@/utils/apiClient';
 import { useTasks } from '@/hooks/useTasks';
 import TaskCheckButton from '@/components/ui/TaskCheckButton';
 import CategoryLabel from '@/components/ui/CategoryLabel';
-import FocusStreakBadge from '@/components/ui/FocusStreakBadge';
 import { triggerTaskCompletionEffect } from '@/utils/celebration';
-import type { Analytics, AIRecommendation, ScheduleBlock, Task, TaskStatus } from '@/types';
-import { deadlineLabel, deadlineUrgency, hoursToReadable, formatDate } from '@/utils/dateUtils';
+import { buildGoogleCalendarTemplateUrl } from '@/config/firebase';
+import type { ScheduleBlock, Task, TaskStatus, AIRecommendation } from '@/types';
+import { deadlineLabel, hoursToReadable, formatDate } from '@/utils/dateUtils';
 import { PRIORITY_CONFIG } from '@/config/constants';
 import clsx from 'clsx';
 import toast from 'react-hot-toast';
@@ -34,28 +34,32 @@ const BOARD_COLUMNS: Array<{
   droppableId: string;
   title: string;
   dotClass: string;
+  padTint: string;
   emptyText: string;
 }> = [
   {
     id: 'pending',
     droppableId: 'column-pending',
     title: 'To Do',
-    dotClass: 'bg-slate-400',
-    emptyText: 'Drop tasks here to queue for study',
+    dotClass: 'bg-[#E779C1]',
+    padTint: 'bg-[#FDF4F9] border-[#F2C7E5]',
+    emptyText: 'Drop tasks here to queue',
   },
   {
     id: 'in_progress',
     droppableId: 'column-in_progress',
     title: 'In Progress',
-    dotClass: 'bg-blue-600',
-    emptyText: 'Drag active tasks here while working',
+    dotClass: 'bg-[#A855F7]',
+    padTint: 'bg-[#F8F2FF] border-[#DFC7FA]',
+    emptyText: 'Drag active tasks here',
   },
   {
     id: 'completed',
     droppableId: 'column-completed',
     title: 'Completed',
-    dotClass: 'bg-emerald-500',
-    emptyText: 'Drop tasks here to mark complete',
+    dotClass: 'bg-[#34D399]',
+    padTint: 'bg-[#F0FDF4] border-[#BBF7D0]',
+    emptyText: 'Drop tasks here to complete',
   },
 ];
 
@@ -68,23 +72,18 @@ function sortTasksByOrder(list: Task[]): Task[] {
 }
 
 export default function DashboardPage() {
-  const { tasks, activeTasks, archivedTasks, isLoading: tasksLoading, completeTask, reorderTasks } = useTasks();
+  const { activeTasks, isLoading: tasksLoading, completeTask, reorderTasks } = useTasks();
   const navigate = useNavigate();
   const qc = useQueryClient();
 
-  const { data: analytics, isLoading: analyticsLoading } = useQuery<Analytics>({
-    queryKey: ['analytics'],
-    queryFn: async () => (await apiClient.get('/analytics')).data.data,
+  const { data: scheduleBlocks } = useQuery<ScheduleBlock[]>({
+    queryKey: ['schedule'],
+    queryFn: async () => (await apiClient.get('/schedule')).data.data,
   });
 
   const { data: recommendation } = useQuery<AIRecommendation | null>({
     queryKey: ['recommendation'],
     queryFn: async () => (await apiClient.get('/ai/recommend')).data.data,
-  });
-
-  const { data: scheduleBlocks } = useQuery<ScheduleBlock[]>({
-    queryKey: ['schedule'],
-    queryFn: async () => (await apiClient.get('/schedule')).data.data,
   });
 
   const completeBlockMutation = useMutation({
@@ -95,7 +94,6 @@ export default function DashboardPage() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['schedule'] });
-      qc.invalidateQueries({ queryKey: ['analytics'] });
       toast.success('Study block completed');
     },
   });
@@ -145,13 +143,7 @@ export default function DashboardPage() {
     [orderedTasks]
   );
 
-  const upcomingList = useMemo(() => pendingTasks.slice(0, 8), [pendingTasks]);
-
-  const completionRate = analytics?.completionRate ?? 0;
-  const streakDays = analytics?.streakDays ?? 0;
-  const completedCount =
-    analytics?.completedTasks ?? tasks.filter((t) => t.status === 'completed').length;
-  const totalCount = analytics?.totalTasks ?? tasks.length;
+  const upcomingList = useMemo(() => pendingTasks.slice(0, 6), [pendingTasks]);
 
   const handleDragEnd = (result: DropResult) => {
     const { source, destination, type } = result;
@@ -163,7 +155,6 @@ export default function DashboardPage() {
       return;
     }
 
-    // 1. Reordering within Today's Study Blocks column
     if (type === 'TODAY_BLOCKS') {
       const nextBlocks = Array.from(todayBlocks);
       const [moved] = nextBlocks.splice(source.index, 1);
@@ -174,7 +165,6 @@ export default function DashboardPage() {
       return;
     }
 
-    // 2. Reordering within Upcoming Deadlines column
     if (type === 'UPCOMING_TASKS') {
       const nextUpcoming = Array.from(upcomingList);
       const [moved] = nextUpcoming.splice(source.index, 1);
@@ -194,7 +184,6 @@ export default function DashboardPage() {
       return;
     }
 
-    // 3. Reordering within or across Dashboard Task Columns (To Do / In Progress / Completed)
     if (type === 'BOARD_TASK') {
       const sourceStatus = source.droppableId.replace('column-', '') as TaskStatus;
       const destStatus = destination.droppableId.replace('column-', '') as TaskStatus;
@@ -243,545 +232,387 @@ export default function DashboardPage() {
     }
   };
 
+  const now = new Date();
+
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="page-shell space-y-6">
-        {/* Focus Streak Counter & Visual Badge */}
-        <FocusStreakBadge
-          variant="banner"
-          streakDays={streakDays}
-          completedToday={analytics?.completedToday}
-          weeklyProgress={analytics?.weeklyProgress}
-          tasks={tasks}
-        />
-
-        {/* Key Metrics Strip (Single-Elevation, Tabular Numerals) */}
-        {analyticsLoading ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="skeleton h-24" />
-            ))}
+      <div className="page-shell space-y-7">
+        {/* Editorial Diary Spread Header */}
+        <div className="card-accent p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-2xl bg-white border border-[#E5B8E0] flex flex-col items-center justify-center shrink-0 shadow-xs">
+              <span className="text-[10px] uppercase tracking-wider text-[#B8328A]">
+                {format(now, 'MMM')}
+              </span>
+              <span className="text-xl text-[#2A1029] tabular-nums leading-none mt-0.5">
+                {format(now, 'dd')}
+              </span>
+            </div>
+            <div>
+              <h1 className="text-2xl sm:text-3xl text-[#2A1029] tracking-tight">
+                {format(now, 'EEEE')}’s Journal Spread
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-600 mt-0.5">
+                {pendingTasks.length} open task{pendingTasks.length !== 1 ? 's' : ''} ·{' '}
+                {todayBlocks.length} study block{todayBlocks.length !== 1 ? 's' : ''} scheduled today
+              </p>
+            </div>
           </div>
-        ) : (
-          <div className="card grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
-            <div className="p-5">
-              <div className="text-xs font-medium text-slate-500">Completion Rate</div>
-              <div className="mt-2 flex items-baseline justify-between gap-2">
-                <span className="stat-number">{completionRate.toFixed(0)}%</span>
-                <span className="text-xs text-slate-500 font-mono tabular-nums">
-                  {completedCount}/{totalCount} done
-                </span>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => navigate('/schedule')}
+              className="btn-secondary"
+            >
+              <Calendar className="w-4 h-4" />
+              <span>Google Calendar Sync</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/tasks?new=1')}
+              className="btn-primary"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Task</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Next Best Task Recommendation Banner */}
+        {recommendation?.nextTask && (
+          <div className="card bg-[#FFFCFE] p-4 sm:p-5 border-l-[3px] border-l-[#B8328A] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3.5 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-[#FDF4F9] border border-[#E8CEE6] flex items-center justify-center text-[#B8328A] shrink-0 mt-0.5">
+                <Sparkles className="w-4 h-4" />
               </div>
-              <div className="progress-bar mt-3">
-                <div
-                  className="progress-fill"
-                  style={{ width: `${Math.min(100, completionRate)}%` }}
-                />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] uppercase tracking-wider text-[#B8328A] font-semibold">
+                    Recommended Next Focus
+                  </span>
+                  <span className="text-[11px] tabular-nums px-2 py-0.5 rounded-lg bg-[#FDF4F9] text-[#781D59] border border-[#F0C6E4]">
+                    Urgency {recommendation.urgencyScore}/10
+                  </span>
+                  <CategoryLabel category={recommendation.nextTask.category} />
+                </div>
+                <div className="text-sm sm:text-base text-[#2A1029] font-medium mt-1 truncate">
+                  {recommendation.nextTask.title}
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  {recommendation.reason} · Est.{' '}
+                  <span className="tabular-nums">
+                    {hoursToReadable(
+                      recommendation.nextTask.aiPredictedHours ??
+                        recommendation.nextTask.estimatedHours
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="p-5">
-              <div className="text-xs font-medium text-slate-500">Study Time Logged</div>
-              <div className="mt-2 flex items-baseline justify-between gap-2">
-                <span className="stat-number">
-                  {hoursToReadable(analytics?.totalStudyHours ?? 0)}
-                </span>
-                <span className="text-xs text-slate-500 font-mono tabular-nums">
-                  Target 6h/d
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-2.5">
-                Tracked across completed sessions
-              </div>
-            </div>
-
-            <div className="p-5">
-              <div className="text-xs font-medium text-slate-500">Active Workload</div>
-              <div className="mt-2 flex items-baseline justify-between gap-2">
-                <span className="stat-number">{pendingTasks.length}</span>
-                <span className="text-xs text-slate-500 font-mono tabular-nums">
-                  {hoursToReadable(
-                    pendingTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0)
-                  )}{' '}
-                  est.
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-2.5">
-                Pending and in-progress tasks
-              </div>
-            </div>
-
-            <div className="p-5">
-              <div className="text-xs font-medium text-slate-500">Focus Score</div>
-              <div className="mt-2 flex items-baseline justify-between gap-2 flex-wrap">
-                <span className="stat-number">
-                  {(analytics?.avgProductivityScore ?? 0).toFixed(1)}
-                  <span className="text-sm font-normal text-slate-400">/10</span>
-                </span>
-                <FocusStreakBadge
-                  variant="badge"
-                  streakDays={streakDays}
-                  completedToday={analytics?.completedToday}
-                  weeklyProgress={analytics?.weeklyProgress}
-                  tasks={tasks}
-                />
-              </div>
-              <div className="text-xs text-slate-500 mt-2.5">
-                Average session productivity
-              </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => navigate(`/plan?taskId=${recommendation.nextTask._id}`)}
+                className="btn-secondary py-1.5 px-3 text-xs"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Study Plan</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => completeTask(recommendation.nextTask._id)}
+                className="btn-primary py-1.5 px-3 text-xs"
+              >
+                <span>Complete</span>
+              </button>
             </div>
           </div>
         )}
 
-        {/* Main Two-Column Workspace */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Left Column: Next Priority Focus + Today's Timeline */}
-          <div className="lg:col-span-3 space-y-6">
-            {/* Next Recommended Task */}
-            <div className="card p-5 sm:p-6">
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="text-xs font-semibold text-brand-600">
-                  Recommended Focus
-                </div>
-                {recommendation && (
-                  <div className="text-xs text-slate-500 font-mono tabular-nums">
-                    Urgency {recommendation.urgencyScore}/10
-                  </div>
-                )}
+        {/* Two-Column Plain Diary Sheets: Upcoming Tasks & Today's Schedule */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Diary Page: Upcoming Tasks on Plain Surface */}
+          <div className="card bg-[#FFFCFE] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8CEE6] bg-[#FFF9FD]">
+              <div>
+                <h2 className="text-base text-[#2A1029]">Upcoming Tasks</h2>
+                <p className="text-xs text-slate-500">Priority checklist</p>
               </div>
-
-              {recommendation?.nextTask ? (
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base sm:text-lg font-semibold text-slate-900">
-                      {recommendation.nextTask.title}
-                    </h2>
-                    <CategoryLabel category={recommendation.nextTask.category} />
-                  </div>
-                  <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
-                    {recommendation.reason}
-                  </p>
-
-                  {/* Clean unboxed metadata with typographic separators */}
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100">
-                    <span className="font-medium text-slate-700">
-                      {recommendation.nextTask.subject}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span
-                      className={clsx(
-                        'font-medium',
-                        recommendation.nextTask.priority === 'high'
-                          ? 'text-red-600'
-                          : recommendation.nextTask.priority === 'medium'
-                          ? 'text-amber-600'
-                          : 'text-emerald-600'
-                      )}
-                    >
-                      {PRIORITY_CONFIG[recommendation.nextTask.priority].label} Priority
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-mono tabular-nums">
-                      {deadlineLabel(recommendation.nextTask.deadline)}
-                    </span>
-                    <span aria-hidden="true">·</span>
-                    <span className="font-mono tabular-nums">
-                      {hoursToReadable(recommendation.nextTask.estimatedHours)} est.
-                    </span>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2.5 mt-4">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        triggerTaskCompletionEffect(e);
-                        completeTask(recommendation.nextTask._id);
-                      }}
-                      className="btn-primary"
-                    >
-                      <Check className="w-4 h-4" />
-                      <span>Mark Complete</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/plan?taskId=${recommendation.nextTask._id}`)
-                      }
-                      className="btn-secondary"
-                    >
-                      <BookOpen className="w-4 h-4" />
-                      <span>Open Study Plan</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate(`/tasks?edit=${recommendation.nextTask._id}`)
-                      }
-                      className="btn-ghost"
-                    >
-                      <span>Edit Task</span>
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="py-6 text-center">
-                  <div className="text-sm font-medium text-slate-700">
-                    No pending tasks to recommend
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Create a task with a deadline and priority to get smart scheduling suggestions.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/tasks?new=1')}
-                    className="btn-primary mt-3"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>Create Task</span>
-                  </button>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => navigate('/tasks')}
+                className="text-xs text-[#B8328A] hover:text-[#96246F] inline-flex items-center gap-1"
+              >
+                <span>All tasks</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
             </div>
 
-            {/* Today's Study Schedule (Draggable Reorderable Column) */}
-            <div className="card overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/80">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Today&apos;s Study Blocks
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5 font-mono tabular-nums">
-                    {todayBlocks.filter((b) => b.isCompleted).length} of {todayBlocks.length} blocks completed · Drag to reorder
-                  </p>
-                </div>
+            {tasksLoading ? (
+              <div className="p-5 space-y-3 bg-[#FFFCFE]">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="skeleton h-12" />
+                ))}
+              </div>
+            ) : upcomingList.length === 0 ? (
+              <div className="p-12 text-center flex-1 flex flex-col items-center justify-center bg-[#FFFCFE]">
+                <div className="text-sm text-slate-700 bg-[#FFFCFE]">Your diary page is clear</div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/tasks?new=1')}
+                  className="btn-primary mt-3"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Write First Task</span>
+                </button>
+              </div>
+            ) : (
+              <Droppable droppableId="upcoming-deadlines" type="UPCOMING_TASKS">
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="divide-y divide-[#EAD4E8]/75 flex-1 bg-[#FFFCFE]"
+                  >
+                    {upcomingList.map((task, index) => (
+                      <Draggable
+                        key={task._id}
+                        draggableId={`upcoming-${task._id}`}
+                        index={index}
+                      >
+                        {(dragProvided) => (
+                          <div
+                            ref={dragProvided.innerRef}
+                            {...dragProvided.draggableProps}
+                            className="flex items-center gap-3 px-4 py-3 bg-[#FFFCFE] hover:bg-[#FDF4F9] transition-colors group"
+                          >
+                            {/* Left Margin Date Column */}
+                            <div className="w-10 text-[11px] text-[#B8328A] tabular-nums shrink-0 text-right pr-1">
+                              {formatDate(task.deadline, 'MMM d')}
+                            </div>
+
+                            <div
+                              {...dragProvided.dragHandleProps}
+                              className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing p-0.5 rounded shrink-0"
+                            >
+                              <GripVertical className="w-3.5 h-3.5" />
+                            </div>
+
+                            <TaskCheckButton
+                              size="sm"
+                              checked={task.status === 'completed'}
+                              onToggle={() => completeTask(task._id)}
+                              label={`Mark ${task.title} complete`}
+                            />
+
+                            <button
+                              type="button"
+                              onClick={() => navigate(`/tasks?edit=${task._id}`)}
+                              className="flex-1 min-w-0 text-left"
+                            >
+                              <div className="text-sm text-[#2A1029] truncate group-hover:text-[#B8328A] transition-colors">
+                                {task.title}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs text-slate-500 mt-0.5">
+                                <span>{task.subject}</span>
+                                <span aria-hidden="true">·</span>
+                                <span>{PRIORITY_CONFIG[task.priority].label}</span>
+                                <span aria-hidden="true">·</span>
+                                <span className="tabular-nums">
+                                  {hoursToReadable(task.estimatedHours)}
+                                </span>
+                              </div>
+                            </button>
+
+                            <span className="text-xs text-slate-500 tabular-nums shrink-0">
+                              {deadlineLabel(task.deadline)}
+                            </span>
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            )}
+          </div>
+
+          {/* Right Diary Page: Today's Schedule & Google Calendar Quick Add */}
+          <div className="card bg-[#FFFCFE] overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E8CEE6] bg-[#FFF9FD]">
+              <div>
+                <h2 className="text-base text-[#2A1029]">Today&apos;s Diary Timeline</h2>
+                <p className="text-xs text-slate-500">Synced study blocks & Google Calendar</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/schedule')}
+                className="text-xs text-[#B8328A] hover:text-[#96246F] inline-flex items-center gap-1"
+              >
+                <span>Open Calendar</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {todayBlocks.length === 0 ? (
+              <div className="p-12 text-center flex-1 flex flex-col items-center justify-center bg-[#FFFCFE]">
+                <Calendar className="w-5 h-5 text-[#C83E8B] mx-auto mb-2" />
+                <div className="text-sm text-slate-700 bg-[#FFFCFE]">No study blocks planned for today</div>
                 <button
                   type="button"
                   onClick={() => navigate('/schedule')}
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"
+                  className="btn-primary mt-3"
                 >
-                  <span>Full schedule</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
+                  <span>Plan & Sync Calendar</span>
                 </button>
               </div>
-
-              {todayBlocks.length === 0 ? (
-                <div className="p-8 text-center">
-                  <Clock className="w-5 h-5 text-slate-400 mx-auto mb-2" />
-                  <div className="text-sm font-medium text-slate-700">
-                    No blocks scheduled for today
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Generate an optimized weekly timeline from your pending tasks.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/schedule')}
-                    className="btn-ghost mt-3"
+            ) : (
+              <Droppable droppableId="today-blocks" type="TODAY_BLOCKS">
+                {(provided) => (
+                  <div
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="divide-y divide-[#EAD4E8]/75 flex-1 bg-[#FFFCFE]"
                   >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                    <span>Go to Schedule Optimizer</span>
-                  </button>
-                </div>
-              ) : (
-                <Droppable droppableId="today-blocks" type="TODAY_BLOCKS">
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={clsx(
-                        'divide-y divide-slate-100 transition-colors',
-                        snapshot.isDraggingOver && 'bg-brand-50/25'
-                      )}
-                    >
-                      {todayBlocks.map((block, index) => (
+                    {todayBlocks.map((block, index) => {
+                      const gcalUrl = buildGoogleCalendarTemplateUrl({
+                        title: block.task?.title ?? 'Study Session',
+                        description: block.task?.subject
+                          ? `Subject: ${block.task.subject}`
+                          : 'Scheduled in TaskTracker Diary',
+                        date: block.date,
+                        startTime: block.startTime,
+                        endTime: block.endTime,
+                      });
+
+                      return (
                         <Draggable
                           key={block._id}
                           draggableId={`block-${block._id}`}
                           index={index}
                         >
-                          {(dragProvided, dragSnapshot) => (
+                          {(dragProvided) => (
                             <div
                               ref={dragProvided.innerRef}
                               {...dragProvided.draggableProps}
-                              className={clsx(
-                                'flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 transition-colors group',
-                                dragSnapshot.isDragging
-                                  ? 'bg-white shadow-lg ring-1 ring-brand-500/30 rounded-lg z-20'
-                                  : 'hover:bg-slate-50/70'
-                              )}
+                              className="flex items-center justify-between gap-3 px-4 py-3 bg-[#FFFCFE] hover:bg-[#FDF4F9] transition-colors"
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
+                                {/* Left Margin Time Stamp */}
+                                <div className="w-10 text-[11px] text-[#86198F] tabular-nums shrink-0 text-right pr-1">
+                                  {block.startTime}
+                                </div>
+
                                 <div
                                   {...dragProvided.dragHandleProps}
-                                  className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing p-1 -ml-1 rounded transition-colors"
-                                  title="Drag to reorder study block"
-                                  aria-label="Drag to reorder study block"
+                                  className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing p-0.5 rounded"
                                 >
-                                  <GripVertical className="w-4 h-4" />
+                                  <GripVertical className="w-3.5 h-3.5" />
                                 </div>
 
                                 <TaskCheckButton
                                   checked={block.isCompleted}
-                                  disabled={
-                                    block.isCompleted || completeBlockMutation.isPending
-                                  }
+                                  disabled={block.isCompleted || completeBlockMutation.isPending}
                                   onToggle={() => completeBlockMutation.mutate(block._id)}
                                   label="Mark study block complete"
                                 />
 
                                 <div className="min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span
-                                      className={clsx(
-                                        'text-sm font-medium truncate',
-                                        block.isCompleted
-                                          ? 'line-through text-slate-400'
-                                          : 'text-slate-900'
-                                      )}
-                                    >
-                                      {block.task?.title ?? 'Focused Study Session'}
-                                    </span>
-                                    {block.task?.category && (
-                                      <CategoryLabel category={block.task.category} />
+                                  <div
+                                    className={clsx(
+                                      'text-sm truncate',
+                                      block.isCompleted
+                                        ? 'line-through text-slate-400'
+                                        : 'text-[#2A1029]'
                                     )}
+                                  >
+                                    {block.task?.title ?? 'Study Session'}
                                   </div>
-                                  <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
-                                    <span className="font-mono tabular-nums text-slate-700">
-                                      {block.startTime} – {block.endTime}
-                                    </span>
-                                    <span aria-hidden="true">·</span>
-                                    <span className="font-mono tabular-nums">
-                                      {block.durationMinutes}m
-                                    </span>
-                                    {block.task?.subject && (
-                                      <>
-                                        <span aria-hidden="true">·</span>
-                                        <span>{block.task.subject}</span>
-                                      </>
-                                    )}
+                                  <div className="text-xs text-slate-500 tabular-nums mt-0.5">
+                                    {block.startTime} – {block.endTime} · {block.durationMinutes}m
                                   </div>
                                 </div>
                               </div>
 
-                              <div className="text-xs font-medium shrink-0">
-                                {block.isCompleted ? (
-                                  <span className="text-emerald-600">Done</span>
-                                ) : (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <a
+                                  href={gcalUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="px-2 py-1 rounded-lg text-[11px] bg-[#FDF4F9] hover:bg-[#FCE8F4] text-[#96246F] border border-[#F0C6E4] inline-flex items-center gap-1 transition-colors"
+                                  title="Add to Google Calendar"
+                                >
+                                  <ExternalLink className="w-3 h-3" />
+                                  <span className="hidden sm:inline">GCal</span>
+                                </a>
+                                {!block.isCompleted && (
                                   <button
                                     type="button"
                                     onClick={(e) => {
                                       triggerTaskCompletionEffect(e);
                                       completeBlockMutation.mutate(block._id);
                                     }}
-                                    className="text-slate-500 hover:text-brand-600 transition-colors"
+                                    className="btn-primary py-1 px-2.5 text-xs"
                                   >
-                                    Complete
+                                    Done
                                   </button>
                                 )}
                               </div>
                             </div>
                           )}
                         </Draggable>
-                      ))}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              )}
-            </div>
-          </div>
-
-          {/* Right Column: Upcoming Deadlines (Draggable Reorderable Column) */}
-          <div className="lg:col-span-2">
-            <div className="card overflow-hidden h-full flex flex-col">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/80">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">
-                    Upcoming Deadlines
-                  </h2>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Drag tasks to prioritize your queue
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/tasks')}
-                  className="text-xs font-medium text-brand-600 hover:text-brand-700 inline-flex items-center gap-1"
-                >
-                  <span>All tasks</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {tasksLoading ? (
-                <div className="p-5 space-y-3">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="skeleton h-14" />
-                  ))}
-                </div>
-              ) : upcomingList.length === 0 ? (
-                <div className="p-10 text-center flex-1 flex flex-col items-center justify-center">
-                  <div className="text-sm font-medium text-slate-700">
-                    No upcoming deadlines
+                      );
+                    })}
+                    {provided.placeholder}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    You&apos;re all caught up on your coursework.
-                  </p>
-                </div>
-              ) : (
-                <Droppable droppableId="upcoming-deadlines" type="UPCOMING_TASKS">
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.droppableProps}
-                      className={clsx(
-                        'divide-y divide-slate-100 flex-1 transition-colors',
-                        snapshot.isDraggingOver && 'bg-brand-50/25'
-                      )}
-                    >
-                      {upcomingList.map((task, index) => {
-                        const urgency = deadlineUrgency(task.deadline);
-                        return (
-                          <Draggable
-                            key={task._id}
-                            draggableId={`upcoming-${task._id}`}
-                            index={index}
-                          >
-                            {(dragProvided, dragSnapshot) => (
-                              <div
-                                ref={dragProvided.innerRef}
-                                {...dragProvided.draggableProps}
-                                className={clsx(
-                                  'flex items-start gap-2.5 px-4 sm:px-5 py-3.5 transition-colors group',
-                                  dragSnapshot.isDragging
-                                    ? 'bg-white shadow-lg ring-1 ring-brand-500/30 rounded-lg z-20'
-                                    : 'hover:bg-slate-50/70'
-                                )}
-                              >
-                                <div
-                                  {...dragProvided.dragHandleProps}
-                                  className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing p-1 -ml-1 mt-0.5 rounded transition-colors shrink-0"
-                                  title="Drag to reorder task"
-                                  aria-label={`Drag to reorder ${task.title}`}
-                                >
-                                  <GripVertical className="w-4 h-4" />
-                                </div>
-
-                                <TaskCheckButton
-                                  size="sm"
-                                  checked={task.status === 'completed'}
-                                  onToggle={() => completeTask(task._id)}
-                                  label={`Mark ${task.title} complete`}
-                                  title="Complete task"
-                                  className="mt-0.5"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => navigate(`/tasks?edit=${task._id}`)}
-                                  className="flex-1 min-w-0 text-left"
-                                >
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <span className="text-sm font-medium text-slate-900 truncate group-hover:text-brand-600 transition-colors">
-                                      {task.title}
-                                    </span>
-                                    <CategoryLabel category={task.category} />
-                                  </div>
-                                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 mt-1">
-                                    <span>{task.subject}</span>
-                                    <span aria-hidden="true">·</span>
-                                    <span
-                                      className={clsx(
-                                        'font-medium',
-                                        task.priority === 'high'
-                                          ? 'text-red-600'
-                                          : task.priority === 'medium'
-                                          ? 'text-amber-600'
-                                          : 'text-slate-600'
-                                      )}
-                                    >
-                                      {PRIORITY_CONFIG[task.priority].label}
-                                    </span>
-                                    <span aria-hidden="true">·</span>
-                                    <span className="font-mono tabular-nums">
-                                      {hoursToReadable(task.estimatedHours)}
-                                    </span>
-                                  </div>
-                                </button>
-
-                                <div className="text-right shrink-0">
-                                  <div
-                                    className={clsx(
-                                      'text-xs font-medium font-mono tabular-nums inline-flex items-center gap-1',
-                                      urgency === 'critical'
-                                        ? 'text-red-600'
-                                        : urgency === 'warning'
-                                        ? 'text-amber-600'
-                                        : 'text-slate-600'
-                                    )}
-                                  >
-                                    {urgency === 'critical' && (
-                                      <AlertTriangle className="w-3 h-3 shrink-0" />
-                                    )}
-                                    <span>{deadlineLabel(task.deadline)}</span>
-                                  </div>
-                                  <div className="text-[11px] text-slate-400 font-mono tabular-nums mt-0.5">
-                                    {formatDate(task.deadline, 'MMM d')}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </Draggable>
-                        );
-                      })}
-                      {provided.placeholder}
-                    </div>
-                  )}
-                </Droppable>
-              )}
-            </div>
+                )}
+              </Droppable>
+            )}
           </div>
         </div>
 
-        {/* Interactive Drag-and-Drop Task Workflow Columns */}
+        {/* Pastel Stationery 3-Column Task Board */}
         <div className="card p-5 sm:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 mb-4 border-b border-slate-200/80">
+          <div className="flex items-center justify-between gap-2 pb-4 mb-4 border-b border-[#EAD4E8]">
             <div>
-              <h2 className="text-sm font-semibold text-slate-900">
-                Task Workflow Board
-              </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Drag and drop tasks to reorder within columns or move tasks across stages
+              <h2 className="text-base text-[#2A1029]">Stationery Task Board</h2>
+              <p className="text-xs text-slate-500">
+                Drag notes across Blush, Lavender, and Mint stages
               </p>
             </div>
             <button
               type="button"
               onClick={() => navigate('/tasks?new=1')}
-              className="btn-ghost text-xs self-start sm:self-auto"
+              className="btn-primary text-xs"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add Task</span>
+              <span>Add Note</span>
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {BOARD_COLUMNS.map((col) => {
               const colTasks = orderedTasks.filter((t) => t.status === col.id);
               return (
                 <div
                   key={col.id}
-                  className="flex flex-col rounded-xl bg-slate-50/80 border border-slate-200/80 p-3 min-h-[260px]"
+                  className={clsx(
+                    'flex flex-col rounded-2xl border p-3.5 min-h-[240px]',
+                    col.padTint
+                  )}
                 >
-                  <div className="flex items-center justify-between px-1.5 pb-2.5 mb-2 border-b border-slate-200/60">
+                  <div className="flex items-center justify-between px-1.5 pb-2.5 mb-2.5 border-b border-[#EAD4E8]/80">
                     <div className="flex items-center gap-2">
                       <span
-                        className={clsx('w-2 h-2 rounded-full shrink-0', col.dotClass)}
+                        className={clsx('w-2.5 h-2.5 rounded-full shrink-0', col.dotClass)}
                         aria-hidden="true"
                       />
-                      <h3 className="text-xs font-semibold text-slate-800 uppercase tracking-wider">
-                        {col.title}
-                      </h3>
+                      <h3 className="text-xs text-[#2A1029]">{col.title}</h3>
                     </div>
-                    <span className="text-xs font-mono tabular-nums text-slate-500">
+                    <span className="text-xs tabular-nums text-slate-500">
                       {colTasks.length}
                     </span>
                   </div>
@@ -792,13 +623,12 @@ export default function DashboardPage() {
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={clsx(
-                          'flex-1 space-y-2.5 rounded-lg p-1 transition-colors min-h-[200px]',
-                          snapshot.isDraggingOver &&
-                            'bg-brand-50/50 ring-1 ring-brand-500/20'
+                          'flex-1 space-y-2.5 rounded-xl p-1 transition-colors min-h-[180px]',
+                          snapshot.isDraggingOver && 'bg-white/60'
                         )}
                       >
                         {colTasks.length === 0 && !snapshot.isDraggingOver && (
-                          <div className="h-44 flex items-center justify-center text-center px-4">
+                          <div className="h-40 flex items-center justify-center text-center px-4">
                             <p className="text-xs text-slate-400">{col.emptyText}</p>
                           </div>
                         )}
@@ -814,17 +644,16 @@ export default function DashboardPage() {
                                 ref={dragProvided.innerRef}
                                 {...dragProvided.draggableProps}
                                 className={clsx(
-                                  'rounded-lg bg-white p-3.5 border transition-all group',
+                                  'rounded-xl bg-white/95 p-3.5 border transition-all group',
                                   dragSnapshot.isDragging
-                                    ? 'shadow-lg ring-2 ring-brand-500/30 border-brand-300 rotate-[0.5deg] z-30'
-                                    : 'border-slate-200/90 shadow-xs hover:border-slate-300'
+                                    ? 'shadow-lg border-[#D44FA6] rotate-[0.5deg] z-30'
+                                    : 'border-[#EAD4E8] hover:border-[#D4A4D1] shadow-xs'
                                 )}
                               >
                                 <div className="flex items-start gap-2.5">
                                   <div
                                     {...dragProvided.dragHandleProps}
                                     className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing p-0.5 -ml-1 mt-0.5 rounded transition-colors shrink-0"
-                                    title="Drag to reorder"
                                     aria-label={`Drag ${task.title}`}
                                   >
                                     <GripVertical className="w-3.5 h-3.5" />
@@ -839,43 +668,22 @@ export default function DashboardPage() {
                                   />
 
                                   <div className="flex-1 min-w-0">
-                                    <div className="flex items-start justify-between gap-2">
-                                      <button
-                                        type="button"
-                                        onClick={() => navigate(`/tasks?edit=${task._id}`)}
-                                        className={clsx(
-                                          'text-xs sm:text-sm font-medium text-left leading-snug hover:text-brand-600 transition-colors line-clamp-2',
-                                          task.status === 'completed'
-                                            ? 'line-through text-slate-400'
-                                            : 'text-slate-900'
-                                        )}
-                                      >
-                                        {task.title}
-                                      </button>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => navigate(`/tasks?edit=${task._id}`)}
+                                      className={clsx(
+                                        'text-xs sm:text-sm text-left leading-snug hover:text-[#B8328A] transition-colors line-clamp-2',
+                                        task.status === 'completed'
+                                          ? 'line-through text-slate-400'
+                                          : 'text-[#2A1029]'
+                                      )}
+                                    >
+                                      {task.title}
+                                    </button>
 
-                                    <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+                                    <div className="mt-2 pt-2 border-t border-[#F5E8F3] flex items-center justify-between gap-2 text-[11px] text-slate-500">
                                       <CategoryLabel category={task.category} />
-                                    </div>
-
-                                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-2 text-[11px] text-slate-500">
-                                      <div className="flex items-center gap-1.5 min-w-0 truncate">
-                                        <span className="truncate">{task.subject}</span>
-                                        <span aria-hidden="true">·</span>
-                                        <span
-                                          className={clsx(
-                                            'font-medium shrink-0',
-                                            task.priority === 'high'
-                                              ? 'text-red-600'
-                                              : task.priority === 'medium'
-                                              ? 'text-amber-600'
-                                              : 'text-slate-600'
-                                          )}
-                                        >
-                                          {PRIORITY_CONFIG[task.priority].label}
-                                        </span>
-                                      </div>
-                                      <span className="font-mono tabular-nums shrink-0">
+                                      <span className="tabular-nums shrink-0">
                                         {formatDate(task.deadline, 'MMM d')}
                                       </span>
                                     </div>
@@ -889,21 +697,6 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </Droppable>
-
-                  {col.id === 'completed' && archivedTasks.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-slate-200/60 flex items-center justify-between px-1.5 text-[11px] text-slate-500">
-                      <span>
-                        +{archivedTasks.length} auto-archived (&gt;24h)
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => navigate('/tasks?view=archive')}
-                        className="font-medium text-brand-600 hover:text-brand-700"
-                      >
-                        Archive →
-                      </button>
-                    </div>
-                  )}
                 </div>
               );
             })}

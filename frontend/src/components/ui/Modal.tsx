@@ -32,19 +32,19 @@ export default function Modal({ isOpen, onClose, title, children }: ModalProps) 
         if (e.target === overlayRef.current) onClose();
       }}
     >
-      <div className="absolute inset-0 bg-slate-900/35 backdrop-blur-[2px]" />
+      <div className="absolute inset-0 bg-slate-900/20 backdrop-blur-[2px]" />
       <div
-        className="relative w-full max-w-lg rounded-xl bg-white border border-slate-200 shadow-xl animate-scale-in max-h-[90vh] flex flex-col"
+        className="relative w-full max-w-lg rounded-2xl bg-white border border-[#F0DFEE] shadow-xl animate-scale-in max-h-[90vh] flex flex-col"
         role="dialog"
         aria-modal="true"
         aria-label={title || 'Modal'}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/80 shrink-0">
-            <h2 className="text-base font-semibold text-slate-900 tracking-tight">{title}</h2>
+          <div className="flex items-center justify-between px-6 py-4 border-b border-[#F0DFEE] shrink-0">
+            <h2 className="text-base text-slate-900 tracking-tight">{title}</h2>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-[#FDF4F9] transition-colors"
               aria-label="Close"
             >
               <X className="w-4 h-4" />

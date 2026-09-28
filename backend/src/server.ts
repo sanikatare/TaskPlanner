@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { connectDB } from './utils/database';
+import { connectDB, getDatabaseMode } from './utils/database';
 import { initFirebaseAdmin } from './utils/firebaseAdmin';
 import { logger } from './utils/logger';
 import { errorHandler } from './middleware/errorHandler';
@@ -58,7 +58,13 @@ app.use('/api/calendar',  calendarRoutes);
 
 // Health check (Render & container readiness)
 const healthHandler = (_: express.Request, res: express.Response) =>
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    service: 'tasktrack-ai-backend',
+    database: getDatabaseMode(),
+    uptime: Math.round(process.uptime()),
+    timestamp: new Date().toISOString(),
+  });
 app.get('/health', healthHandler);
 app.get('/api/health', healthHandler);
 

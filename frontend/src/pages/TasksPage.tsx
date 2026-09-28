@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -163,22 +163,30 @@ function TaskForm({
       {/* Priority Segmented Selector */}
       <div>
         <label className="label">Priority</label>
-        <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 rounded-lg">
-          {(['low', 'medium', 'high'] as Priority[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => update('priority', p)}
-              className={clsx(
-                'py-1.5 px-3 rounded-md text-xs font-medium transition-colors',
-                form.priority === p
-                  ? 'bg-white text-slate-900 shadow-sm font-semibold'
-                  : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              {PRIORITY_CONFIG[p].label}
-            </button>
-          ))}
+        <div className="grid grid-cols-3 gap-2 p-1 bg-[#F7ECF5] border border-[#F0DFEE] rounded-xl">
+          {(['low', 'medium', 'high'] as Priority[]).map((p) => {
+            const cfg = PRIORITY_CONFIG[p];
+            const isSelected = form.priority === p;
+            return (
+              <button
+                key={p}
+                type="button"
+                onClick={() => update('priority', p)}
+                className={clsx(
+                  'py-1.5 px-3 rounded-lg text-xs font-medium transition-all inline-flex items-center justify-center gap-1.5 border',
+                  isSelected
+                    ? clsx(cfg.badgeClass, 'shadow-xs font-semibold')
+                    : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-white/60'
+                )}
+              >
+                <span
+                  className={clsx('w-2 h-2 rounded-full shrink-0', cfg.dotClass)}
+                  aria-hidden="true"
+                />
+                <span>{cfg.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -262,12 +270,116 @@ function TaskForm({
   );
 }
 
+function HighlightMatch({ text, query }: { text: string; query: string }) {
+  const trimmed = query.trim();
+  if (!trimmed) return <>{text}</>;
+
+  const terms = trimmed
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (terms.length === 0) return <>{text}</>;
+
+  const regex = new RegExp(`(${terms.join('|')})`, 'gi');
+  const parts = text.split(regex);
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        i % 2 === 1 ? (
+          <mark
+            key={i}
+            className="bg-[#FCE8F4] text-[#96246F] rounded px-0.5 font-normal"
+          >
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  );
+}
+
+function PriorityBadge({
+  priority,
+  active = false,
+  onClick,
+}: {
+  priority: Priority;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  const cfg = PRIORITY_CONFIG[priority] ?? PRIORITY_CONFIG.medium;
+  const level = cfg.weight; // 3 = High, 2 = Medium, 1 = Low
+
+  const badgeContent = (
+    <>
+      <span
+        className="inline-flex items-end gap-[2px] h-2.5 shrink-0"
+        aria-hidden="true"
+      >
+        {[1, 2, 3].map((bar) => (
+          <span
+            key={bar}
+            className={clsx(
+              'w-[2.5px] rounded-full transition-colors',
+              bar === 1 ? 'h-1.5' : bar === 2 ? 'h-2' : 'h-2.5',
+              bar <= level
+                ? active
+                  ? 'bg-white'
+                  : cfg.dotClass
+                : active
+                ? 'bg-white/35'
+                : 'bg-current/20'
+            )}
+          />
+        ))}
+      </span>
+      <span>{cfg.label}</span>
+    </>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+        title={`Filter by ${cfg.label} Priority`}
+        className={clsx(
+          'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-[11px] leading-4 border transition-all whitespace-nowrap shrink-0 cursor-pointer hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
+          active ? cfg.activeBadgeClass : cfg.badgeClass
+        )}
+      >
+        {badgeContent}
+      </button>
+    );
+  }
+
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl text-[11px] leading-4 border whitespace-nowrap shrink-0',
+        cfg.badgeClass
+      )}
+    >
+      {badgeContent}
+    </span>
+  );
+}
+
 function TaskRow({
   task,
+  searchQuery = '',
   isArchiveView,
+  activePriorityFilter = 'all',
   onToggleComplete,
   onStatusChange,
   onCategoryClick,
+  onPriorityClick,
   onEdit,
   onSkip,
   onArchive,
@@ -277,10 +389,13 @@ function TaskRow({
   onOpenPlan,
 }: {
   task: Task;
+  searchQuery?: string;
   isArchiveView?: boolean;
+  activePriorityFilter?: Priority | 'all';
   onToggleComplete: () => void;
   onStatusChange: (status: TaskStatus) => void;
   onCategoryClick: (category: SubjectCategory) => void;
+  onPriorityClick: (priority: Priority) => void;
   onEdit: () => void;
   onSkip: () => void;
   onArchive: () => void;
@@ -292,15 +407,18 @@ function TaskRow({
   const urgency = deadlineUrgency(task.deadline);
   const isCompleted = task.status === 'completed';
   const remainingArchiveHours = hoursUntilArchive(task);
+  const priorityCfg = PRIORITY_CONFIG[task.priority] ?? PRIORITY_CONFIG.medium;
 
   return (
     <div
       className={clsx(
-        'flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50/80 transition-colors group',
-        isCompleted && 'opacity-75 bg-slate-50/40'
+        'flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50/80 transition-colors group border-l-[3px]',
+        isCompleted
+          ? 'opacity-75 bg-slate-50/40 border-l-slate-300'
+          : priorityCfg.accentBorderClass
       )}
     >
-      {/* Left: Checkbox + Title + Unboxed Metadata */}
+      {/* Left: Checkbox + Title + Badges + Metadata */}
       <div className="flex items-start gap-3.5 min-w-0 flex-1">
         <TaskCheckButton
           checked={isCompleted}
@@ -320,8 +438,13 @@ function TaskRow({
                 isCompleted ? 'line-through text-slate-500' : 'text-slate-900'
               )}
             >
-              {task.title}
+              <HighlightMatch text={task.title} query={searchQuery} />
             </button>
+            <PriorityBadge
+              priority={task.priority}
+              active={activePriorityFilter === task.priority}
+              onClick={() => onPriorityClick(task.priority)}
+            />
             <CategoryLabel
               category={task.category}
               onClick={() => onCategoryClick(task.category)}
@@ -330,25 +453,14 @@ function TaskRow({
 
           {task.description && (
             <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">
-              {task.description}
+              <HighlightMatch text={task.description} query={searchQuery} />
             </p>
           )}
 
           {/* Unboxed Metadata Line */}
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500 mt-1.5">
-            <span className="font-medium text-slate-700">{task.subject}</span>
-            <span aria-hidden="true">·</span>
-            <span
-              className={clsx(
-                'font-medium',
-                task.priority === 'high'
-                  ? 'text-red-600'
-                  : task.priority === 'medium'
-                  ? 'text-amber-600'
-                  : 'text-emerald-600'
-              )}
-            >
-              {PRIORITY_CONFIG[task.priority].label} Priority
+            <span className="font-medium text-slate-700">
+              <HighlightMatch text={task.subject} query={searchQuery} />
             </span>
             <span aria-hidden="true">·</span>
             <span
@@ -458,14 +570,14 @@ function TaskRow({
               onChange={(e) => onStatusChange(e.target.value as TaskStatus)}
               aria-label="Task status"
               className={clsx(
-                'text-xs font-medium rounded-lg px-2.5 py-1.5 border transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-500/20',
+                'text-xs rounded-xl px-2.5 py-1.5 border transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-brand-400/20',
                 task.status === 'completed'
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  ? 'bg-[#FDF4F9] text-[#B8328A] border-[#F3CBE6]'
                   : task.status === 'in_progress'
-                  ? 'bg-brand-50 text-brand-700 border-brand-200'
+                  ? 'bg-[#FAF5FF] text-[#7E22CE] border-[#E9D5FF]'
                   : task.status === 'skipped'
-                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                  : 'bg-slate-50 text-slate-700 border-slate-200'
+                  ? 'bg-[#FCF8FB] text-slate-500 border-[#F0DFEE]'
+                  : 'bg-white text-slate-700 border-[#F0DFEE]'
               )}
             >
               {Object.entries(STATUS_CONFIG).map(([k, v]) => (
@@ -548,15 +660,36 @@ export default function TasksPage() {
   } = useTasks();
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [showCreate, setShowCreate] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [showArchive, setShowArchive] = useState(false);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [filterStatus, setFilterStatus] = useState<TaskStatus | 'all'>('all');
   const [filterPriority, setFilterPriority] = useState<Priority | 'all'>('all');
   const [filterCategory, setFilterCategory] = useState<SubjectCategory | 'all'>('all');
   const [sortBy, setSortBy] = useState<SortField>('deadline');
+
+  // Keyboard shortcut: press '/' anywhere outside an input to focus the top search bar
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (
+        e.key === '/' &&
+        !e.metaKey &&
+        !e.ctrlKey &&
+        !e.altKey &&
+        document.activeElement?.tagName !== 'INPUT' &&
+        document.activeElement?.tagName !== 'TEXTAREA' &&
+        document.activeElement?.tagName !== 'SELECT'
+      ) {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Sync URL query params (?new=1, ?edit=<id>, or ?view=archive)
   useEffect(() => {
@@ -594,14 +727,31 @@ export default function TasksPage() {
   const baseSourceList = showArchive ? archivedTasks : activeTasks;
 
   const filtered = useMemo(() => {
+    const terms = search
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
+
     const list = baseSourceList.filter((t) => {
-      const q = search.toLowerCase();
+      const categoryLabel = CATEGORY_CONFIG[t.category]?.label?.toLowerCase() ?? '';
+      const priorityLabel = PRIORITY_CONFIG[t.priority]?.label?.toLowerCase() ?? '';
+      const statusLabel = STATUS_CONFIG[t.status]?.label?.toLowerCase() ?? '';
+
       const matchSearch =
-        !q ||
-        t.title.toLowerCase().includes(q) ||
-        t.subject.toLowerCase().includes(q) ||
-        (t.description ?? '').toLowerCase().includes(q) ||
-        t.tags.some((tag) => tag.toLowerCase().includes(q));
+        terms.length === 0 ||
+        terms.every(
+          (q) =>
+            t.title.toLowerCase().includes(q) ||
+            t.subject.toLowerCase().includes(q) ||
+            (t.description ?? '').toLowerCase().includes(q) ||
+            t.category.toLowerCase().includes(q) ||
+            categoryLabel.includes(q) ||
+            t.priority.toLowerCase().includes(q) ||
+            priorityLabel.includes(q) ||
+            statusLabel.includes(q) ||
+            t.tags.some((tag) => tag.toLowerCase().includes(q))
+        );
       const matchStatus =
         showArchive || filterStatus === 'all' || t.status === filterStatus;
       const matchPriority = filterPriority === 'all' || t.priority === filterPriority;
@@ -712,104 +862,163 @@ export default function TasksPage() {
         </div>
       </div>
 
-      {/* Interactive Status Segmented Tabs (shown in main active task view) */}
-      {!showArchive ? (
-        <div className="flex items-center gap-1 p-1 bg-slate-200/60 rounded-lg overflow-x-auto w-full sm:w-fit">
-          {(
-            [
-              { id: 'all', label: 'All' },
-              { id: 'pending', label: 'Pending' },
-              { id: 'in_progress', label: 'In Progress' },
-              { id: 'completed', label: 'Completed (<24h)' },
-              { id: 'skipped', label: 'Skipped' },
-            ] as const
-          ).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setFilterStatus(tab.id)}
-              className={clsx(
-                'px-3 py-1.5 rounded-md text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-1.5',
-                filterStatus === tab.id
-                  ? 'bg-white text-slate-900 shadow-sm font-semibold'
-                  : 'text-slate-600 hover:text-slate-900'
-              )}
-            >
-              <span>{tab.label}</span>
-              <span
-                className={clsx(
-                  'font-mono tabular-nums text-[11px]',
-                  filterStatus === tab.id ? 'text-brand-600' : 'text-slate-400'
-                )}
-              >
-                {statusCounts[tab.id]}
-              </span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div className="card px-4 py-3 bg-slate-50/90 border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5 text-xs text-slate-600">
-            <Archive className="w-4 h-4 text-slate-500 shrink-0" />
-            <span>
-              Completed tasks are automatically moved to this hidden Archive list after{' '}
-              <strong className="font-semibold text-slate-800">24 hours</strong> to keep your main task view clean.
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowArchive(false)}
-            className="text-xs font-semibold text-brand-600 hover:text-brand-700 shrink-0 self-start sm:self-auto"
-          >
-            Return to main view →
-          </button>
-        </div>
-      )}
-
-      {/* Search, Priority, Category & Sort Controls */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      {/* Top Search Bar */}
+      <div className="card bg-[#FFFCFE] p-2.5 sm:p-3">
+        <div className="relative flex items-center">
+          <Search
+            className="absolute left-3.5 w-4 h-4 text-[#B8328A]/70 pointer-events-none"
+            aria-hidden="true"
+          />
           <input
-            className="input pl-9 pr-8"
+            ref={searchInputRef}
+            type="search"
+            aria-label="Search tasks"
+            className="input pl-10 pr-28 py-2.5 bg-white border-[#E8CEE6] text-sm"
             placeholder={
               showArchive
-                ? 'Search archived tasks...'
-                : 'Filter by title, subject, tag, or description...'
+                ? 'Search archived tasks by title, subject, category, or tag...'
+                : 'Search tasks by title, subject, category, priority, tag, or notes...'
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                if (search) {
+                  setSearch('');
+                } else {
+                  searchInputRef.current?.blur();
+                }
+              }
+            }}
           />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              aria-label="Clear search"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="absolute right-2.5 flex items-center gap-2">
+            {search.trim() ? (
+              <>
+                <span className="text-xs text-slate-500 font-mono tabular-nums hidden sm:inline">
+                  {filtered.length} {filtered.length === 1 ? 'match' : 'matches'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    searchInputRef.current?.focus();
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs text-slate-600 bg-[#FDF4F9] hover:bg-[#FCE8F4] border border-[#F0C6E4] transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Clear</span>
+                </button>
+              </>
+            ) : (
+              <kbd
+                className="hidden sm:inline-flex items-center px-2 py-0.5 text-[11px] font-mono text-slate-400 bg-[#FDF4F9] border border-[#EAD4E8] rounded-md pointer-events-none"
+                title="Press / to search"
+              >
+                /
+              </kbd>
+            )}
+          </div>
         </div>
+      </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Priority Interactive Filter Buttons */}
-          <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-lg border border-slate-200/80">
-            {(['all', 'high', 'medium', 'low'] as const).map((p) => (
+      {/* Interactive Status Segmented Tabs & Filter Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        {!showArchive ? (
+          <div className="flex items-center gap-1 p-1 bg-[#F7ECF5] border border-[#F0DFEE] rounded-xl overflow-x-auto w-full sm:w-fit">
+            {(
+              [
+                { id: 'all', label: 'All' },
+                { id: 'pending', label: 'Pending' },
+                { id: 'in_progress', label: 'In Progress' },
+                { id: 'completed', label: 'Completed (<24h)' },
+                { id: 'skipped', label: 'Skipped' },
+              ] as const
+            ).map((tab) => (
               <button
-                key={p}
+                key={tab.id}
                 type="button"
-                onClick={() => setFilterPriority(p)}
+                onClick={() => setFilterStatus(tab.id)}
                 className={clsx(
-                  'px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap',
-                  filterPriority === p
-                    ? 'bg-white text-slate-900 shadow-sm font-semibold'
+                  'px-3 py-1.5 rounded-lg text-xs transition-colors whitespace-nowrap flex items-center gap-1.5',
+                  filterStatus === tab.id
+                    ? 'bg-white text-slate-900 shadow-xs'
                     : 'text-slate-600 hover:text-slate-900'
                 )}
               >
-                {p === 'all' ? 'All Priority' : PRIORITY_CONFIG[p].label}
+                <span>{tab.label}</span>
+                <span
+                  className={clsx(
+                    'tabular-nums text-[11px]',
+                    filterStatus === tab.id ? 'text-[#C83E8B]' : 'text-slate-400'
+                  )}
+                >
+                  {statusCounts[tab.id]}
+                </span>
               </button>
             ))}
+          </div>
+        ) : (
+          <div className="card px-4 py-3 bg-[#FFFCFE] border-[#E8CEE6] flex flex-col sm:flex-row sm:items-center justify-between gap-2 flex-1">
+            <div className="flex items-center gap-2.5 text-xs text-slate-600">
+              <Archive className="w-4 h-4 text-slate-500 shrink-0" />
+              <span>
+                Completed tasks are automatically moved to this hidden Archive list after{' '}
+                <strong className="font-semibold text-slate-800">24 hours</strong> to keep your main task view clean.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowArchive(false)}
+              className="text-xs font-semibold text-brand-600 hover:text-brand-700 shrink-0 self-start sm:self-auto"
+            >
+              Return to main view →
+            </button>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Priority Interactive Filter Buttons */}
+          <div className="flex items-center gap-1 p-1 bg-[#F7ECF5] rounded-xl border border-[#F0DFEE]">
+            {(['all', 'high', 'medium', 'low'] as const).map((p) => {
+              const isSelected = filterPriority === p;
+              const count =
+                p === 'all'
+                  ? baseSourceList.length
+                  : baseSourceList.filter((t) => t.priority === p).length;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setFilterPriority(p)}
+                  className={clsx(
+                    'px-2.5 py-1 rounded-lg text-xs transition-colors whitespace-nowrap inline-flex items-center gap-1.5',
+                    isSelected
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  )}
+                >
+                  {p !== 'all' && (
+                    <span
+                      className={clsx(
+                        'w-1.5 h-1.5 rounded-full shrink-0',
+                        PRIORITY_CONFIG[p].dotClass
+                      )}
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>{p === 'all' ? 'All Priority' : PRIORITY_CONFIG[p].label}</span>
+                  <span
+                    className={clsx(
+                      'tabular-nums text-[11px]',
+                      isSelected ? 'text-[#C83E8B]' : 'text-slate-400'
+                    )}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
 
           {!showArchive && (
@@ -922,12 +1131,14 @@ export default function TasksPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="card divide-y divide-slate-200/80 overflow-hidden">
+          <div className="card bg-[#FFFCFE] divide-y divide-[#EAD4E8]/75 overflow-hidden">
             {filtered.map((task) => (
               <TaskRow
                 key={task._id}
                 task={task}
+                searchQuery={search}
                 isArchiveView={showArchive}
+                activePriorityFilter={filterPriority}
                 onToggleComplete={() =>
                   task.status === 'completed'
                     ? updateTask(task._id, { status: 'pending' })
@@ -936,6 +1147,9 @@ export default function TasksPage() {
                 onStatusChange={(status) => handleStatusChange(task, status)}
                 onCategoryClick={(cat) =>
                   setFilterCategory((prev) => (prev === cat ? 'all' : cat))
+                }
+                onPriorityClick={(p) =>
+                  setFilterPriority((prev) => (prev === p ? 'all' : p))
                 }
                 onEdit={() => setEditingTask(task)}
                 onSkip={() => skipTask(task._id)}

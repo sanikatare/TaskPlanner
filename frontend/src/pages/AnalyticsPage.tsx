@@ -37,7 +37,7 @@ const CHART_DEFAULTS = {
   plugins: {
     legend: {
       labels: {
-        color: '#64748b',
+        color: '#6E476C',
         font: { family: '"Playfair Display", Georgia, serif', size: 11, weight: 'normal' as const },
         padding: 14,
         usePointStyle: true,
@@ -45,29 +45,29 @@ const CHART_DEFAULTS = {
       },
     },
     tooltip: {
-      backgroundColor: '#0f172a',
-      borderColor: '#1e293b',
+      backgroundColor: '#2A122B',
+      borderColor: '#543253',
       borderWidth: 1,
-      titleColor: '#f8fafc',
-      bodyColor: '#cbd5e1',
+      titleColor: '#FDF2F8',
+      bodyColor: '#F9CEE9',
       titleFont: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 12 },
       bodyFont: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 },
       padding: 10,
       boxPadding: 5,
-      cornerRadius: 8,
+      cornerRadius: 10,
       displayColors: true,
       usePointStyle: true,
     },
   },
   scales: {
     x: {
-      ticks: { color: '#64748b', font: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 } },
-      grid: { color: '#f1f5f9', drawBorder: false },
+      ticks: { color: '#8D648A', font: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 } },
+      grid: { color: '#F8EDF6', drawBorder: false },
       border: { display: false },
     },
     y: {
-      ticks: { color: '#64748b', font: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 } },
-      grid: { color: '#f1f5f9', drawBorder: false },
+      ticks: { color: '#8D648A', font: { family: '"Playfair Display", Georgia, serif', weight: 'normal' as const, size: 11 } },
+      grid: { color: '#F8EDF6', drawBorder: false },
       border: { display: false },
     },
   },
@@ -106,14 +106,14 @@ export default function AnalyticsPage() {
       {
         label: 'Completed Blocks',
         data: (analytics?.weeklyProgress ?? []).map((w) => w.completed),
-        backgroundColor: '#2563eb',
-        borderRadius: 4,
+        backgroundColor: '#D645A6',
+        borderRadius: 6,
       },
       {
         label: 'Planned Blocks',
         data: (analytics?.weeklyProgress ?? []).map((w) => w.planned),
-        backgroundColor: '#cbd5e1',
-        borderRadius: 4,
+        backgroundColor: '#E9D5FF',
+        borderRadius: 6,
       },
     ],
   };
@@ -125,12 +125,12 @@ export default function AnalyticsPage() {
         label: 'Study Hours',
         data: (analytics?.weeklyProgress ?? []).map((w) => w.studyHours),
         fill: true,
-        backgroundColor: 'rgba(37, 99, 235, 0.08)',
-        borderColor: '#2563eb',
+        backgroundColor: 'rgba(214, 69, 166, 0.12)',
+        borderColor: '#BA2D8B',
         borderWidth: 2,
         tension: 0.35,
-        pointBackgroundColor: '#ffffff',
-        pointBorderColor: '#2563eb',
+        pointBackgroundColor: '#FFFBFD',
+        pointBorderColor: '#BA2D8B',
         pointBorderWidth: 2,
         pointRadius: 3.5,
         pointHoverRadius: 5,
@@ -140,12 +140,12 @@ export default function AnalyticsPage() {
 
   const subjectLabels = Object.keys(analytics?.tasksBySubject ?? {});
   const subjectColors = [
-    '#2563eb',
-    '#0f172a',
-    '#16a34a',
-    '#d97706',
-    '#64748b',
-    '#3b82f6',
+    '#D645A6',
+    '#9333EA',
+    '#E874C0',
+    '#A855F7',
+    '#7E1C5D',
+    '#F4A6D7',
   ];
   const doughnutData = {
     labels: subjectLabels,
@@ -172,7 +172,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Top KPI Strip (Tabular Numerals) */}
-      <div className="card grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-slate-200/80">
+      <div className="card grid grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-[#F0DFEE]">
         <div className="p-5">
           <div className="text-xs font-medium text-slate-500">Completion Rate</div>
           <div className="stat-number mt-2">{completionRate.toFixed(0)}%</div>
@@ -309,7 +309,7 @@ export default function AnalyticsPage() {
               {
                 label: 'Completed',
                 value: analytics?.completedTasks ?? 0,
-                color: '#16a34a',
+                color: '#C83E8B',
               },
               {
                 label: 'Pending & In Progress',
@@ -317,12 +317,12 @@ export default function AnalyticsPage() {
                   (analytics?.totalTasks ?? 0) -
                   (analytics?.completedTasks ?? 0) -
                   (analytics?.skippedTasks ?? 0),
-                color: '#2563eb',
+                color: '#A855F7',
               },
               {
                 label: 'Skipped',
                 value: analytics?.skippedTasks ?? 0,
-                color: '#d97706',
+                color: '#E9D5FF',
               },
             ].map((item) => {
               const total = Math.max(1, analytics?.totalTasks ?? 1);

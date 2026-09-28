@@ -1,4 +1,4 @@
-import { Flame, Check, Zap } from 'lucide-react';
+import { Check, Sparkles } from 'lucide-react';
 import { subDays, format } from 'date-fns';
 import type { Task, WeeklyProgress } from '@/types';
 import clsx from 'clsx';
@@ -67,7 +67,6 @@ export function computeConsecutiveTaskStreak(
   const effectiveStreak = Math.max(backendStreakDays, localConsecutive);
   const completedToday = activeDates.has(todayStr) || effectiveStreak > 0;
 
-  // Ensure the last N days up to effectiveStreak (capped at 7) reflect the active streak visually
   const last7Days = [];
   for (let i = 6; i >= 0; i--) {
     const dt = subDays(now, i);
@@ -104,48 +103,17 @@ export default function FocusStreakBadge({
 
   const isActive = effectiveStreak > 0;
 
-  const tierLabel =
-    effectiveStreak >= 14
-      ? 'Unstoppable'
-      : effectiveStreak >= 7
-      ? 'Week Warrior'
-      : effectiveStreak >= 3
-      ? 'On Fire'
-      : effectiveStreak >= 1
-      ? 'Building Momentum'
-      : 'Start Streak';
-
   if (variant === 'badge') {
     return (
       <div
         className={clsx(
-          'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all select-none',
-          isActive
-            ? 'bg-amber-50/90 text-amber-800 border-amber-200/90 shadow-2xs'
-            : 'bg-slate-100 text-slate-600 border-slate-200',
+          'inline-flex items-center gap-1.5 text-xs select-none',
+          isActive ? 'text-[#B8328A]' : 'text-slate-500',
           className
         )}
-        title={`${effectiveStreak} consecutive ${
-          effectiveStreak === 1 ? 'day' : 'days'
-        } of task completion`}
       >
-        <span
-          className={clsx(
-            'inline-flex items-center justify-center w-4 h-4 rounded-full',
-            isActive ? 'bg-amber-500/15 text-amber-600' : 'text-slate-400'
-          )}
-        >
-          <Flame
-            className={clsx(
-              'w-3.5 h-3.5',
-              isActive && 'fill-amber-500 text-amber-600'
-            )}
-          />
-        </span>
-        <span className="font-mono tabular-nums font-bold text-amber-900">
-          {effectiveStreak}
-        </span>
-        <span>{effectiveStreak === 1 ? 'Day Streak' : 'Day Focus Streak'}</span>
+        <Sparkles className="w-3.5 h-3.5 text-[#C83E8B] shrink-0" />
+        <span className="tabular-nums text-slate-900">{effectiveStreak}d streak</span>
       </div>
     );
   }
@@ -153,110 +121,68 @@ export default function FocusStreakBadge({
   return (
     <div
       className={clsx(
-        'card px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 border-amber-200/70 bg-gradient-to-r from-amber-50/50 via-white to-white',
+        'card px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4',
         className
       )}
     >
-      {/* Left: Visual Focus Streak Counter Badge + Status */}
+      {/* Left: Simple Streak Summary */}
       <div className="flex items-center gap-3.5">
-        <div
-          className={clsx(
-            'relative w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border transition-transform',
-            isActive
-              ? 'bg-amber-500/10 border-amber-300/80 text-amber-600 shadow-xs'
-              : 'bg-slate-100 border-slate-200 text-slate-400'
-          )}
-        >
-          <Flame
-            className={clsx(
-              'w-6 h-6 transition-transform',
-              isActive && 'fill-amber-500 text-amber-600 scale-105'
-            )}
-          />
-          {isActive && (
-            <span
-              className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white"
-              title="Streak active"
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-[#FDF4F9] border border-[#F3CBE6] text-[#C83E8B]">
+          <svg viewBox="0 0 24 24" fill="none" className="w-5 h-5" aria-hidden="true">
+            <circle cx="9" cy="10" r="1.3" fill="currentColor" />
+            <circle cx="15" cy="10" r="1.3" fill="currentColor" />
+            <path
+              d="M8.5 14.2C9.5 15.6 11 16.2 12 16.2C13 16.2 14.5 15.6 15.5 14.2"
+              stroke="currentColor"
+              strokeWidth="1.7"
+              strokeLinecap="round"
             />
-          )}
+          </svg>
         </div>
 
         <div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="inline-flex items-baseline gap-1.5">
-              <span className="text-xl font-bold font-mono tabular-nums text-slate-900">
-                {effectiveStreak}
-              </span>
-              <span className="text-sm font-semibold text-slate-800">
-                {effectiveStreak === 1 ? 'Day Focus Streak' : 'Days Focus Streak'}
-              </span>
-            </div>
-
-            {/* Visual Badge Pill */}
-            <span
-              className={clsx(
-                'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border',
-                isActive
-                  ? 'bg-amber-100/80 text-amber-800 border-amber-300/70'
-                  : 'bg-slate-100 text-slate-600 border-slate-200'
-              )}
-            >
-              <Zap className="w-3 h-3 fill-amber-500 text-amber-600" />
-              <span>{tierLabel}</span>
-            </span>
+          <div className="text-base text-slate-900 tabular-nums">
+            {effectiveStreak} {effectiveStreak === 1 ? 'Day Streak' : 'Days Streak'}
           </div>
-
           <p className="text-xs text-slate-500 mt-0.5">
-            {isActive
-              ? `${effectiveStreak} consecutive ${
-                  effectiveStreak === 1 ? 'day' : 'days'
-                } of task completion${
-                  completedTodayProp ?? completedToday
-                    ? ' · Today’s goal completed'
-                    : ' · Complete a task today to extend your streak'
-                }`
-              : 'Complete a task today to ignite your daily focus streak'}
+            {completedTodayProp ?? completedToday
+              ? 'Today’s focus check-in is complete'
+              : 'Complete a task today to keep your streak going'}
           </p>
         </div>
       </div>
 
-      {/* Right: 7-Day Consecutive Completion Chain */}
-      <div className="flex items-center gap-2 sm:gap-2.5 self-start md:self-center">
+      {/* Right: Clean 7-Day Pastel Circles */}
+      <div className="flex items-center gap-2 self-start sm:self-center">
         {last7Days.map((day) => (
           <div
             key={day.dateStr}
             className="flex flex-col items-center gap-1"
-            title={`${day.dayShort} (${day.dateStr}): ${
-              day.active ? 'Completed' : 'No completions'
-            }`}
+            title={`${day.dayShort} (${day.dateStr})`}
           >
             <div
               className={clsx(
-                'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-medium border transition-all',
+                'w-7 h-7 rounded-full flex items-center justify-center text-xs border transition-all',
                 day.active
-                  ? 'bg-amber-500 border-amber-600 text-white shadow-2xs'
+                  ? 'bg-[#FCE7F3] border-[#F3A9D8] text-[#B8328A]'
                   : day.isToday
-                  ? 'bg-white border-dashed border-amber-400 text-amber-700'
-                  : 'bg-slate-50 border-slate-200/80 text-slate-300'
+                  ? 'bg-white border-dashed border-[#E779C1] text-[#B8328A]'
+                  : 'bg-[#FCF8FB] border-[#F0DFEE] text-slate-300'
               )}
             >
               {day.active ? (
-                <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                <Check className="w-3.5 h-3.5 stroke-[2]" />
               ) : (
                 <span className="w-1.5 h-1.5 rounded-full bg-current" />
               )}
             </div>
             <span
               className={clsx(
-                'text-[10px] font-mono tabular-nums',
-                day.isToday
-                  ? 'font-bold text-amber-700'
-                  : day.active
-                  ? 'font-medium text-slate-700'
-                  : 'text-slate-400'
+                'text-[10px] tabular-nums',
+                day.isToday ? 'text-[#B8328A]' : 'text-slate-400'
               )}
             >
-              {day.isToday ? 'Today' : day.dayShort.slice(0, 2)}
+              {day.dayShort}
             </span>
           </div>
         ))}

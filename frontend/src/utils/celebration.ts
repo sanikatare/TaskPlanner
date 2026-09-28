@@ -3,12 +3,12 @@ import type React from 'react';
 let lastBurstTimestamp = 0;
 
 const CONFETTI_COLORS = [
-  '#10b981', // emerald-500
-  '#059669', // emerald-600
-  '#2563eb', // brand-600
-  '#3b82f6', // brand-500
-  '#14b8a6', // teal-500
-  '#f59e0b', // amber-500
+  '#D44FA6', // berry rose
+  '#E779C1', // sakura pink
+  '#9333EA', // orchid purple
+  '#C084FC', // lavender
+  '#F3A9D8', // pastel blush
+  '#B8328A', // deep rose
 ];
 
 export interface BurstOrigin {
@@ -100,7 +100,7 @@ export function triggerTaskCompletionEffect(
   ring.style.width = '28px';
   ring.style.height = '28px';
   ring.style.borderRadius = '9999px';
-  ring.style.border = '2px solid #10b981';
+  ring.style.border = '2px solid #D44FA6';
   ring.style.willChange = 'transform, opacity';
   container.appendChild(ring);
 

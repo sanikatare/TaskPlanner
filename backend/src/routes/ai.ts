@@ -7,18 +7,25 @@ import { User } from '../models/User';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { AppError } from '../middleware/errorHandler';
 import { buildStudyPlanPrompt } from '../services/claudePrompts';
+import {
+  predictTaskTime,
+  recommendNextTask,
+  optimizeStudySchedule,
+  updatePredictionModel,
+} from '../services/aiEngine';
 
 const router = Router();
 router.use(authenticate);
 
-const AI_SERVICE_URL = () => process.env.AI_SERVICE_URL ?? 'http://localhost:8000';
+const externalAiServiceUrl = () => process.env.AI_SERVICE_URL?.trim() || null;
 
-const anthropic = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
-  : null;
+const getAnthropicClient = () =>
+  process.env.ANTHROPIC_API_KEY
+    ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+    : null;
 
-// GET /api/ai/recommend  — next best task recommendation
-router.get('/recommend', async (req: AuthRequest, res: Response, next) => {
+// GET /api/ai/recommend (and POST /api/ai/recommend) — next best task recommendation
+const handleRecommend = async (req: AuthRequest, res: Response, next: (err?: unknown) => void) => {
   try {
     const tasks = await Task.find({
       userId: req.uid,
@@ -30,55 +37,90 @@ router.get('/recommend', async (req: AuthRequest, res: Response, next) => {
       return;
     }
 
-    // Call AI service for recommendation
-    const aiResp = await axios.post(`${AI_SERVICE_URL()}/recommend`, {
-      tasks: tasks.map(t => ({
-        id: t._id.toString(),
-        title: t.title,
-        subject: t.subject,
-        deadline: t.deadline.toISOString(),
-        estimated_hours: t.estimatedHours,
-        priority: t.priority,
-        difficulty: t.difficulty,
-      })),
-    }, { timeout: 5000 });
+    const mappedTasks = tasks.map(t => ({
+      id: t._id.toString(),
+      title: t.title,
+      subject: t.subject,
+      deadline: new Date(t.deadline).toISOString(),
+      estimated_hours: t.aiPredictedHours ?? t.estimatedHours,
+      priority: t.priority,
+      difficulty: t.difficulty,
+      status: t.status,
+    }));
 
-    const { recommended_task_id, reason, urgency_score, alternative_task_ids } = aiResp.data;
+    let rec = recommendNextTask(mappedTasks);
 
-    const nextTask = tasks.find(t => t._id.toString() === recommended_task_id) ?? tasks[0];
-    const altTasks = tasks.filter(t => alternative_task_ids?.includes(t._id.toString())).slice(0, 3);
+    const extUrl = externalAiServiceUrl();
+    if (extUrl) {
+      try {
+        const aiResp = await axios.post(`${extUrl}/recommend`, { tasks: mappedTasks }, { timeout: 3000 });
+        if (aiResp.data?.recommended_task_id) {
+          rec = aiResp.data;
+        }
+      } catch {
+        // Keep native recommendation
+      }
+    }
+
+    const nextTask = tasks.find(t => t._id.toString() === rec?.recommended_task_id) ?? tasks[0];
+    const altTasks = tasks
+      .filter(t => rec?.alternative_task_ids?.includes(t._id.toString()))
+      .slice(0, 3);
 
     res.json({
       success: true,
       data: {
         nextTask,
-        reason:           reason ?? 'Closest deadline with high priority',
-        urgencyScore:     urgency_score ?? 7,
+        reason:           rec?.reason ?? 'Closest deadline with highest priority weight',
+        urgencyScore:     rec?.urgency_score ?? 8.5,
         alternativeTasks: altTasks,
       },
     });
   } catch (err) {
-    // Fallback: simple deadline-priority scoring
-    try {
-      const tasks = await Task.find({ userId: req.uid, status: 'pending' }).sort({ deadline: 1 }).lean();
-      if (tasks.length > 0) {
-        res.json({
-          success: true,
-          data: {
-            nextTask:         tasks[0],
-            reason:           'Nearest deadline — recommended by fallback scheduler',
-            urgencyScore:     8,
-            alternativeTasks: tasks.slice(1, 3),
-          },
-        });
-      } else {
-        res.json({ success: true, data: null });
-      }
-    } catch (fallbackErr) { next(fallbackErr); }
+    next(err);
   }
+};
+
+router.get('/recommend', handleRecommend);
+router.post('/recommend', handleRecommend);
+
+// POST /api/ai/predict-time — direct ML time prediction endpoint
+router.post('/predict-time', (req: AuthRequest, res: Response) => {
+  const { subject, category, difficulty, estimated_hours, estimatedHours } = req.body;
+  const result = predictTaskTime({
+    subject,
+    category,
+    difficulty: Number(difficulty ?? 3),
+    estimatedHours: Number(estimatedHours ?? estimated_hours ?? 1),
+  });
+  res.json({ success: true, data: result, ...result });
 });
 
-// POST /api/ai/generate-plan  — generate Claude AI study plan
+// POST /api/ai/optimize-schedule — direct schedule optimization endpoint
+router.post('/optimize-schedule', (req: AuthRequest, res: Response) => {
+  const result = optimizeStudySchedule({
+    tasks: Array.isArray(req.body.tasks) ? req.body.tasks : [],
+    study_hours_per_day: Number(req.body.study_hours_per_day ?? 6),
+    preferred_times: Array.isArray(req.body.preferred_times)
+      ? req.body.preferred_times
+      : ['morning', 'evening'],
+    start_date: req.body.start_date ?? new Date().toISOString().split('T')[0],
+  });
+  res.json({ success: true, data: result, ...result });
+});
+
+// POST /api/ai/update-model — incremental model learning endpoint
+router.post('/update-model', (req: AuthRequest, res: Response) => {
+  const stats = updatePredictionModel({
+    category: req.body.category,
+    difficulty: Number(req.body.difficulty ?? 3),
+    estimatedHours: Number(req.body.estimatedHours ?? req.body.estimated_hours ?? 1),
+    actualHours: Number(req.body.actualHours ?? req.body.actual_hours ?? 1),
+  });
+  res.json({ success: true, status: 'recorded', ...stats });
+});
+
+// POST /api/ai/generate-plan  — generate Claude AI study plan (with structured academic fallback)
 router.post('/generate-plan', async (req: AuthRequest, res: Response, next) => {
   try {
     const { taskId } = req.body;
@@ -98,6 +140,7 @@ router.post('/generate-plan', async (req: AuthRequest, res: Response, next) => {
       resources?: string[];
     };
 
+    const anthropic = getAnthropicClient();
     if (anthropic) {
       const prompt = buildStudyPlanPrompt(
         {

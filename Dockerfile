@@ -19,7 +19,11 @@ COPY backend ./backend
 ENV NODE_ENV=production
 ENV ALLOW_DEV_AUTH=true
 ENV VITE_ALLOW_DEV_AUTH=true
+ENV VITE_USE_MONGO_AUTH=true
 ENV PORT=3000
+
+# Create directory for persistent local store fallback
+RUN mkdir -p /app/.data /app/backend/.data
 
 # Build React frontend and Express TypeScript backend
 RUN npm run build

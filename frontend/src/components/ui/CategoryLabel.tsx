@@ -20,16 +20,6 @@ export default function CategoryLabel({
   const key = (category in CATEGORY_CONFIG ? category : 'other') as SubjectCategory;
   const cfg = CATEGORY_CONFIG[key] ?? CATEGORY_CONFIG.other;
 
-  const baseClasses = clsx(
-    'inline-flex items-center gap-1.5 rounded-md border font-medium transition-colors whitespace-nowrap shrink-0',
-    size === 'xs' ? 'px-2 py-0.5 text-[11px] leading-4' : 'px-2.5 py-1 text-xs',
-    active
-      ? cfg.activeClass
-      : clsx(cfg.bgClass, cfg.textClass, cfg.borderClass),
-    onClick && 'cursor-pointer hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
-    className
-  );
-
   const content = (
     <>
       <span
@@ -43,6 +33,7 @@ export default function CategoryLabel({
     </>
   );
 
+  // Interactive filter button
   if (onClick) {
     return (
       <button
@@ -51,7 +42,12 @@ export default function CategoryLabel({
           e.stopPropagation();
           onClick();
         }}
-        className={baseClasses}
+        className={clsx(
+          'inline-flex items-center gap-1.5 rounded-xl border transition-all whitespace-nowrap shrink-0 cursor-pointer hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/30',
+          size === 'xs' ? 'px-2.5 py-0.5 text-[11px] leading-4' : 'px-3 py-1 text-xs',
+          active ? cfg.activeClass : clsx(cfg.bgClass, cfg.textClass, cfg.borderClass),
+          className
+        )}
         title={`Filter by ${cfg.label}`}
       >
         {content}
@@ -59,7 +55,19 @@ export default function CategoryLabel({
     );
   }
 
-  return <span className={baseClasses}>{content}</span>;
+  // Static metadata: clean unboxed inline text with dot indicator (Zero-Pill Discipline)
+  return (
+    <span
+      className={clsx(
+        'inline-flex items-center gap-1.5 whitespace-nowrap shrink-0',
+        size === 'xs' ? 'text-xs' : 'text-xs',
+        cfg.textClass,
+        className
+      )}
+    >
+      {content}
+    </span>
+  );
 }
 
 interface CategoryPickerProps {
@@ -110,15 +118,10 @@ export function CategoryPicker({
             aria-checked={isSelected}
             onClick={() => onChange(key)}
             className={clsx(
-              'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border transition-all',
+              'inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs border transition-all',
               isSelected
-                ? clsx(cfg.activeClass, 'shadow-xs font-semibold')
-                : clsx(
-                    cfg.bgClass,
-                    cfg.textClass,
-                    cfg.borderClass,
-                    'hover:opacity-90'
-                  )
+                ? clsx(cfg.activeClass, 'shadow-xs')
+                : clsx(cfg.bgClass, cfg.textClass, cfg.borderClass, 'hover:opacity-90')
             )}
           >
             <span

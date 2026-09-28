@@ -4,12 +4,13 @@ import { StudySession } from '../models/StudySession';
 import { User } from '../models/User';
 import { authenticate, AuthRequest } from '../middleware/authenticate';
 import { AppError } from '../middleware/errorHandler';
+import { predictTaskTime, updatePredictionModel } from '../services/aiEngine';
 import axios from 'axios';
 
 const router = Router();
 router.use(authenticate); // all task routes require auth
 
-const AI_SERVICE_URL = () => process.env.AI_SERVICE_URL ?? 'http://localhost:8000';
+const externalAiServiceUrl = () => process.env.AI_SERVICE_URL?.trim() || null;
 
 async function recordDailyTaskStreak(uid: string): Promise<void> {
   try {
@@ -144,15 +145,26 @@ router.post('/', async (req: AuthRequest, res: Response, next) => {
     const resolvedHours = Number(estimatedHours) || 1;
     const resolvedDifficulty = Number(difficulty ?? 3);
 
-    // Optionally get AI time prediction
-    let aiPredictedHours: number | undefined;
-    try {
-      const aiResp = await axios.post(`${AI_SERVICE_URL()}/predict-time`, {
-        subject: resolvedSubject, category: resolvedCategory, difficulty: resolvedDifficulty, estimatedHours: resolvedHours,
-      }, { timeout: 1500 });
-      aiPredictedHours = aiResp.data.predicted_hours;
-    } catch {
-      aiPredictedHours = Math.max(0.5, Math.round(resolvedHours * (0.85 + 0.08 * resolvedDifficulty) * 4) / 4);
+    // Get AI time prediction (native engine by default, optional external service)
+    let aiPredictedHours = predictTaskTime({
+      subject: resolvedSubject,
+      category: resolvedCategory,
+      difficulty: resolvedDifficulty,
+      estimatedHours: resolvedHours,
+    }).predicted_hours;
+
+    const extUrl = externalAiServiceUrl();
+    if (extUrl) {
+      try {
+        const aiResp = await axios.post(`${extUrl}/predict-time`, {
+          subject: resolvedSubject, category: resolvedCategory, difficulty: resolvedDifficulty, estimatedHours: resolvedHours,
+        }, { timeout: 1500 });
+        if (typeof aiResp.data?.predicted_hours === 'number') {
+          aiPredictedHours = aiResp.data.predicted_hours;
+        }
+      } catch {
+        // Keep native prediction
+      }
     }
 
     const task = await Task.create({
@@ -275,14 +287,24 @@ router.patch('/:id/complete', async (req: AuthRequest, res: Response, next) => {
       });
     } catch { /* non-blocking */ }
 
-    // Send performance data to AI service for model re-training
-    try {
-      await axios.post(`${AI_SERVICE_URL()}/update-model`, {
-        subject: task.subject, category: task.category,
-        difficulty: task.difficulty, estimatedHours: task.estimatedHours,
-        actualHours: hoursSpent, productivityScore: productivityScore ?? 8,
-      }, { timeout: 1500 });
-    } catch { /* non-blocking */ }
+    // Update online prediction model (native engine + optional external service)
+    updatePredictionModel({
+      category: task.category,
+      difficulty: task.difficulty,
+      estimatedHours: task.estimatedHours,
+      actualHours: hoursSpent,
+    });
+
+    const extUrl = externalAiServiceUrl();
+    if (extUrl) {
+      try {
+        await axios.post(`${extUrl}/update-model`, {
+          subject: task.subject, category: task.category,
+          difficulty: task.difficulty, estimatedHours: task.estimatedHours,
+          actualHours: hoursSpent, productivityScore: productivityScore ?? 8,
+        }, { timeout: 1500 });
+      } catch { /* non-blocking */ }
+    }
 
     res.json({ success: true, data: task });
   } catch (err) { next(err); }
